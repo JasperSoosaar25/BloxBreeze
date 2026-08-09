@@ -1,0 +1,59 @@
+name: Build unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run unit tests
+        run: >-
+          xcodebuild test
+          -project BloxBreeze.xcodeproj
+          -scheme BloxBreeze
+          -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest'
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Build unsigned device app
+        run: >-
+          xcodebuild build
+          -project BloxBreeze.xcodeproj
+          -scheme BloxBreeze
+          -configuration Release
+          -sdk iphoneos
+          -destination 'generic/platform=iOS'
+          -derivedDataPath build
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          CODE_SIGN_IDENTITY=''
+
+      - name: Package IPA for KravaSigner
+        run: |
+          mkdir -p package/Payload
+          cp -R build/Build/Products/Release-iphoneos/BloxBreeze.app package/Payload/
+          cd package
+          /usr/bin/zip -qry ../BloxBreeze-unsigned.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: BloxBreeze-unsigned-ipa
+          path: BloxBreeze-unsigned.ipa
+          if-no-files-found: error
+
