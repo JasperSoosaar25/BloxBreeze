@@ -57,11 +57,12 @@ struct NewsCard: View {
                 }
 
                 Text(item.title)
-                    .font(.title3.bold())
+                    .font(.headline)
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let cardSummary {
                     Text(verbatim: cardSummary)
@@ -86,9 +87,10 @@ struct NewsCard: View {
             .padding(16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
         .background(.clear)
         .clipShape(.rect(cornerRadius: 26))
-        .breezeGlass(cornerRadius: 26, tint: item.source.tint.opacity(0.055), interactive: true)
+        .breezeGlass(cornerRadius: 26, tint: item.source.tint.opacity(0.055))
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens the story inside BloxBreeze")
     }
@@ -118,8 +120,7 @@ struct NewsCard: View {
     }
 
     private var looksLikeVideo: Bool {
-        guard let value = item.imageURL?.absoluteString.lowercased() else { return false }
-        return value.contains("video_thumb") || value.contains("amplify_video_thumb")
+        item.hasVideoPreview
     }
 }
 

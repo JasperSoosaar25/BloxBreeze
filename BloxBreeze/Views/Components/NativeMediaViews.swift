@@ -1,9 +1,10 @@
 import AVKit
 import SwiftUI
+import UIKit
 
 struct RemoteMediaImage: View {
     let url: URL
-    var maxHeight: CGFloat = 430
+    var maxHeight: CGFloat = 340
     var onTap: (() -> Void)?
 
     var body: some View {
@@ -14,17 +15,18 @@ struct RemoteMediaImage: View {
                         .overlay(alignment: .bottomTrailing) {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
                                 .font(.caption.bold())
-                                .padding(10)
+                                .frame(width: 38, height: 38)
                                 .background(.ultraThinMaterial, in: Circle())
                                 .padding(10)
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Opens a full-screen image with pinch-to-zoom")
+                .accessibilityHint("Opens a centered full-screen image viewer")
             } else {
                 image
             }
         }
+        .frame(maxWidth: .infinity)
         .clipShape(.rect(cornerRadius: 22))
     }
 
@@ -36,6 +38,7 @@ struct RemoteMediaImage: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: maxHeight)
+                    .padding(8)
             case .failure:
                 ContentUnavailableView("Image unavailable", systemImage: "photo")
                     .frame(maxWidth: .infinity, minHeight: 170, maxHeight: maxHeight)
@@ -44,6 +47,7 @@ struct RemoteMediaImage: View {
                     .frame(maxWidth: .infinity, minHeight: 170, maxHeight: maxHeight)
             }
         }
+        .frame(maxWidth: .infinity)
         .background(Color(uiColor: .secondarySystemBackground))
         .contentShape(.rect)
     }
@@ -76,15 +80,22 @@ struct InlineVideoView: View {
                             Color(uiColor: .secondarySystemBackground)
                         }
 
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .frame(width: 68, height: 68)
-                            .overlay {
-                                Image(systemName: "play.fill")
-                                    .font(.title2.bold())
-                                    .foregroundStyle(.white)
-                                    .offset(x: 2)
-                            }
+                        Rectangle().fill(.black.opacity(0.18))
+
+                        VStack(spacing: 8) {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .frame(width: 64, height: 64)
+                                .overlay {
+                                    Image(systemName: "play.fill")
+                                        .font(.title2.bold())
+                                        .foregroundStyle(.white)
+                                        .offset(x: 2)
+                                }
+                            Text("Play video")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white)
+                        }
                     }
                 }
                 .buttonStyle(.plain)
@@ -92,109 +103,184 @@ struct InlineVideoView: View {
             }
         }
         .aspectRatio(CGFloat(media.aspectRatio ?? (16.0 / 9.0)), contentMode: .fit)
-        .frame(maxWidth: .infinity, maxHeight: 460)
+        .frame(maxWidth: .infinity, maxHeight: 430)
         .background(.black)
         .clipShape(.rect(cornerRadius: 22))
-        .onDisappear {
-            player?.pause()
-        }
+        .onDisappear { player?.pause() }
     }
 }
 
 struct FullScreenImageViewer: View {
     @Environment(\.dismiss) private var dismiss
     let item: ZoomableImageItem
+    @State private var loadedImage: UIImage?
+    @State private var loadFailed = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             Color.black.ignoresSafeArea()
 
-            AsyncImage(url: item.url) { phase in
-                switch phase {
-                case let .success(image):
-                    ZoomableImage(image: image)
-                case .failure:
-                    ContentUnavailableView("Image unavailable", systemImage: "photo")
-                        .foregroundStyle(.white)
-                default:
-                    ProgressView()
-                        .tint(.white)
-                }
+            if let loadedImage {
+                ZoomingImageScrollView(image: loadedImage)
+            } else if loadFailed {
+                ContentUnavailableView("Image unavailable", systemImage: "photo")
+                    .foregroundStyle(.white)
+            } else {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(.white)
             }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            viewerToolbar
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Text("Drag after zooming to look around")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.black.opacity(0.9))
+        }
+        .task(id: item.id) { await loadImage() }
+    }
 
+    private var viewerToolbar: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Image viewer")
+                    .font(.headline)
+                Text("Pinch or double tap to zoom")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
             Button {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
                     .font(.headline.bold())
-                    .frame(width: 44, height: 44)
+                    .frame(width: 42, height: 42)
+                    .background(.white.opacity(0.14), in: Circle())
             }
-            .buttonStyle(.glass)
-            .padding(18)
+            .buttonStyle(.plain)
             .accessibilityLabel("Close image")
         }
-        .statusBarHidden()
+        .foregroundStyle(.white)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(Color.black.opacity(0.9))
+    }
+
+    @MainActor
+    private func loadImage() async {
+        loadedImage = nil
+        loadFailed = false
+        do {
+            var request = URLRequest(url: item.url)
+            request.cachePolicy = .returnCacheDataElseLoad
+            request.timeoutInterval = 30
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let image = UIImage(data: data) else {
+                throw FeedError.invalidResponse
+            }
+            loadedImage = image
+        } catch is CancellationError {
+            return
+        } catch {
+            loadFailed = true
+        }
     }
 }
 
-private struct ZoomableImage: View {
-    let image: Image
-    @State private var scale: CGFloat = 1
-    @State private var settledScale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-    @State private var settledOffset: CGSize = .zero
+private struct ZoomingImageScrollView: UIViewRepresentable {
+    let image: UIImage
 
-    var body: some View {
-        image
-            .resizable()
-            .scaledToFit()
-            .scaleEffect(scale)
-            .offset(offset)
-            .contentShape(.rect)
-            .gesture(
-                MagnificationGesture()
-                    .onChanged { value in
-                        scale = min(max(settledScale * value, 1), 6)
-                        if scale == 1 { offset = .zero }
-                    }
-                    .onEnded { _ in
-                        settledScale = scale
-                        if scale == 1 {
-                            offset = .zero
-                            settledOffset = .zero
-                        }
-                    }
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.delegate = context.coordinator
+        scrollView.minimumZoomScale = 1
+        scrollView.maximumZoomScale = 6
+        scrollView.bouncesZoom = true
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.backgroundColor = .black
+
+        let imageView = UIImageView(image: image)
+        imageView.contentMode = .scaleAspectFit
+        imageView.isUserInteractionEnabled = true
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(imageView)
+
+        NSLayoutConstraint.activate([
+            imageView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            imageView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            imageView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            imageView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+            imageView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
+        ])
+
+        let doubleTap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleDoubleTap(_:))
+        )
+        doubleTap.numberOfTapsRequired = 2
+        scrollView.addGestureRecognizer(doubleTap)
+        context.coordinator.imageView = imageView
+        context.coordinator.scrollView = scrollView
+        return scrollView
+    }
+
+    func updateUIView(_ scrollView: UIScrollView, context: Context) {
+        context.coordinator.imageView?.image = image
+    }
+
+    final class Coordinator: NSObject, UIScrollViewDelegate {
+        weak var imageView: UIImageView?
+        weak var scrollView: UIScrollView?
+
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            imageView
+        }
+
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            let horizontal = max(0, (scrollView.bounds.width - scrollView.contentSize.width) / 2)
+            let vertical = max(0, (scrollView.bounds.height - scrollView.contentSize.height) / 2)
+            scrollView.contentInset = UIEdgeInsets(
+                top: vertical,
+                left: horizontal,
+                bottom: vertical,
+                right: horizontal
             )
-            .simultaneousGesture(
-                DragGesture()
-                    .onChanged { value in
-                        guard scale > 1 else { return }
-                        offset = CGSize(
-                            width: settledOffset.width + value.translation.width,
-                            height: settledOffset.height + value.translation.height
-                        )
-                    }
-                    .onEnded { _ in
-                        settledOffset = offset
-                    }
+        }
+
+        @objc func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
+            guard let scrollView else { return }
+            if scrollView.zoomScale > scrollView.minimumZoomScale {
+                scrollView.setZoomScale(scrollView.minimumZoomScale, animated: true)
+                return
+            }
+
+            let targetScale: CGFloat = 2.5
+            let location = recognizer.location(in: imageView)
+            let width = scrollView.bounds.width / targetScale
+            let height = scrollView.bounds.height / targetScale
+            scrollView.zoom(
+                to: CGRect(
+                    x: location.x - width / 2,
+                    y: location.y - height / 2,
+                    width: width,
+                    height: height
+                ),
+                animated: true
             )
-            .simultaneousGesture(
-                TapGesture(count: 2)
-                    .onEnded {
-                        withAnimation(.snappy) {
-                            if scale > 1 {
-                                scale = 1
-                                settledScale = 1
-                                offset = .zero
-                                settledOffset = .zero
-                            } else {
-                                scale = 2.5
-                                settledScale = 2.5
-                            }
-                        }
-                    }
-            )
-            .accessibilityLabel("Zoomable story image")
-            .accessibilityHint("Pinch or double tap to zoom")
+        }
     }
 }

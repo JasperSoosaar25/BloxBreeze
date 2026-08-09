@@ -62,4 +62,44 @@ final class FreeXFeedParsingTests: XCTestCase {
             "A tidy post"
         )
     }
+
+    func testSyndicatedVideoDetailsBecomePlayableMedia() throws {
+        let json = #"""
+        {
+          "text": "A native video post https://t.co/example",
+          "mediaDetails": [{
+            "type": "video",
+            "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/example.jpg",
+            "original_info": { "height": 1920, "width": 1080 },
+            "video_info": {
+              "aspect_ratio": [9, 16],
+              "variants": [
+                { "content_type": "application/x-mpegURL", "url": "https://video.twimg.com/example.m3u8" },
+                { "bitrate": 632000, "content_type": "video/mp4", "url": "https://video.twimg.com/small.mp4" },
+                { "bitrate": 2176000, "content_type": "video/mp4", "url": "https://video.twimg.com/large.mp4" }
+              ]
+            }
+          }]
+        }
+        """#
+        let item = NewsItem(
+            id: "x:https://nitter.net/Bloxy_News/status/2086215099573010915#m",
+            source: .bloxyNews,
+            title: "Fallback",
+            body: "Fallback body",
+            category: "@Bloxy_News",
+            articleURL: nil,
+            imageURL: nil,
+            publishedAt: .now,
+            metrics: nil
+        )
+
+        let detail = try XPostDetailService.parse(Data(json.utf8), fallbackItem: item)
+
+        XCTAssertEqual(detail.text, "A native video post")
+        XCTAssertEqual(detail.media.count, 1)
+        XCTAssertEqual(detail.media[0].kind, .video)
+        XCTAssertEqual(detail.media[0].url.absoluteString, "https://video.twimg.com/large.mp4")
+        XCTAssertEqual(detail.media[0].aspectRatio, 9.0 / 16.0)
+    }
 }

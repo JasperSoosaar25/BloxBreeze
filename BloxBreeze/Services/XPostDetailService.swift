@@ -17,7 +17,7 @@ struct XPostDetailService: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
         request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("BloxBreeze/1.2 (iOS; native media reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("BloxBreeze/1.3 (iOS; native media reader)", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse,
@@ -25,11 +25,17 @@ struct XPostDetailService: Sendable {
             throw FeedError.invalidResponse
         }
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let payload = try decoder.decode(SyndicatedPost.self, from: data)
-        let media = (payload.mediaDetails ?? []).compactMap(Self.makeMedia)
-        let cleanText = Self.cleanPostText(payload.text)
+        return try Self.parse(data, fallbackItem: item)
+    }
+
+    static func parse(_ data: Data, fallbackItem item: NewsItem) throws -> XPostDetail {
+        guard let payload = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let payloadText = payload["text"] as? String else {
+            throw FeedError.parsing("The public media response did not contain a readable post.")
+        }
+        let mediaItems = payload["mediaDetails"] as? [[String: Any]] ?? []
+        let media = mediaItems.compactMap(Self.makeMedia)
+        let cleanText = Self.cleanPostText(payloadText)
 
         return XPostDetail(
             text: cleanText.isEmpty ? item.body : cleanText,
@@ -58,27 +64,48 @@ struct XPostDetailService: Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func makeMedia(_ item: SyndicatedMedia) -> XPostMedia? {
+    private static func makeMedia(_ item: [String: Any]) -> XPostMedia? {
+        guard let type = item["type"] as? String,
+              let mediaURLValue = item["media_url_https"] as? String else { return nil }
+        let originalInfo = item["original_info"] as? [String: Any]
+        let videoInfo = item["video_info"] as? [String: Any]
+
         let ratio: Double? = {
-            if let values = item.videoInfo?.aspectRatio,
+            if let values = videoInfo?["aspect_ratio"] as? [NSNumber],
                values.count == 2,
-               values[1] != 0 {
-                return values[0] / values[1]
+               values[1].doubleValue != 0 {
+                return values[0].doubleValue / values[1].doubleValue
             }
-            if let info = item.originalInfo, info.height != 0 {
-                return Double(info.width) / Double(info.height)
+            if let width = (originalInfo?["width"] as? NSNumber)?.doubleValue,
+               let height = (originalInfo?["height"] as? NSNumber)?.doubleValue,
+               height != 0 {
+                return width / height
             }
             return nil
         }()
 
-        let previewURL = highQualityImageURL(item.mediaUrlHttps)
-        if item.type == "video" || item.type == "animated_gif" {
-            let variants = item.videoInfo?.variants ?? []
-            let mp4 = variants
-                .filter { $0.contentType == "video/mp4" }
-                .max { ($0.bitrate ?? 0) < ($1.bitrate ?? 0) }
-            let stream = mp4 ?? variants.first(where: { $0.contentType == "application/x-mpegURL" })
-            guard let stream, let url = URL(string: stream.url) else { return nil }
+        let previewURL = highQualityImageURL(mediaURLValue)
+        if type == "video" || type == "animated_gif" {
+            let variants = videoInfo?["variants"] as? [[String: Any]] ?? []
+            let mp4Variants = variants.filter {
+                ($0["content_type"] as? String) == "video/mp4"
+            }
+            let mobileVariants = mp4Variants.filter {
+                (($0["bitrate"] as? NSNumber)?.intValue ?? 0) <= 3_000_000
+            }
+            let mp4 = mobileVariants
+                .max {
+                    (($0["bitrate"] as? NSNumber)?.intValue ?? 0) <
+                        (($1["bitrate"] as? NSNumber)?.intValue ?? 0)
+                } ?? mp4Variants.min {
+                    (($0["bitrate"] as? NSNumber)?.intValue ?? 0) <
+                        (($1["bitrate"] as? NSNumber)?.intValue ?? 0)
+                }
+            let stream = mp4 ?? variants.first(where: {
+                ($0["content_type"] as? String) == "application/x-mpegURL"
+            })
+            guard let urlValue = stream?["url"] as? String,
+                  let url = URL(string: urlValue) else { return nil }
             return XPostMedia(kind: .video, url: url, previewURL: previewURL, aspectRatio: ratio)
         }
 
@@ -94,32 +121,4 @@ struct XPostDetailService: Sendable {
         components.queryItems = items
         return components.url
     }
-}
-
-private struct SyndicatedPost: Decodable {
-    let text: String
-    let mediaDetails: [SyndicatedMedia]?
-}
-
-private struct SyndicatedMedia: Decodable {
-    let type: String
-    let mediaUrlHttps: String
-    let originalInfo: SyndicatedOriginalInfo?
-    let videoInfo: SyndicatedVideoInfo?
-}
-
-private struct SyndicatedOriginalInfo: Decodable {
-    let height: Int
-    let width: Int
-}
-
-private struct SyndicatedVideoInfo: Decodable {
-    let aspectRatio: [Double]?
-    let variants: [SyndicatedVideoVariant]
-}
-
-private struct SyndicatedVideoVariant: Decodable {
-    let bitrate: Int?
-    let contentType: String
-    let url: String
 }

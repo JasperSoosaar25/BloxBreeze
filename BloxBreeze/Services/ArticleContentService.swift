@@ -176,7 +176,7 @@ struct ArticleContentService: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 30
         request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("BloxBreeze/1.2 (iOS; native article reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("BloxBreeze/1.3 (iOS; native article reader)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw FeedError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {

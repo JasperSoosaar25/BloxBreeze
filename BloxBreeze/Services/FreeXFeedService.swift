@@ -43,7 +43,7 @@ struct FreeXFeedService: Sendable {
                 var request = URLRequest(url: url)
                 request.timeoutInterval = 15
                 request.cachePolicy = .reloadRevalidatingCacheData
-                request.setValue("BloxBreeze/1.2 (iOS; free native RSS reader)", forHTTPHeaderField: "User-Agent")
+                request.setValue("BloxBreeze/1.3 (iOS; free native RSS reader)", forHTTPHeaderField: "User-Agent")
 
                 let (data, response) = try await URLSession.shared.data(for: request)
                 guard let http = response as? HTTPURLResponse else { throw FeedError.invalidResponse }
@@ -52,13 +52,32 @@ struct FreeXFeedService: Sendable {
                 }
 
                 let items = try Self.parse(data, source: source)
-                if !items.isEmpty { return Array(items.prefix(20)) }
+                if !items.isEmpty {
+                    return await enrichVideoMedia(in: Array(items.prefix(20)))
+                }
             } catch {
                 lastError = error
             }
         }
 
         throw lastError
+    }
+
+    private func enrichVideoMedia(in items: [NewsItem]) async -> [NewsItem] {
+        await withTaskGroup(of: NewsItem.self) { group in
+            for item in items {
+                group.addTask {
+                    guard item.hasVideoPreview else { return item }
+                    guard let detail = try? await XPostDetailService().fetch(for: item),
+                          detail.media.contains(where: { $0.kind == .video }) else { return item }
+                    return item.withMedia(detail.media)
+                }
+            }
+
+            var enriched: [NewsItem] = []
+            for await item in group { enriched.append(item) }
+            return enriched.sorted { $0.publishedAt > $1.publishedAt }
+        }
     }
 
     static func parse(_ data: Data, source: NewsSource) throws -> [NewsItem] {

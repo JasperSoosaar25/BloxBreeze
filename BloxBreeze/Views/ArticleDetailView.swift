@@ -32,6 +32,8 @@ private struct XPostReader: View {
     let item: NewsItem
     @State private var detail: XPostDetail?
     @State private var selectedImage: ZoomableImageItem?
+    @State private var isResolvingMedia = false
+    @State private var mediaError: String?
 
     var body: some View {
         ZStack {
@@ -58,6 +60,15 @@ private struct XPostReader: View {
                         }
                     }
 
+                    if item.hasVideoPreview && displayMedia.isEmpty {
+                        VideoResolutionPanel(
+                            previewURL: item.imageURL,
+                            isLoading: isResolvingMedia,
+                            message: mediaError,
+                            retry: { Task { await resolvePost() } }
+                        )
+                    }
+
                     if let metrics = item.metrics {
                         MetricsBar(metrics: metrics)
                     }
@@ -78,7 +89,7 @@ private struct XPostReader: View {
             }
         }
         .task(id: item.id) {
-            detail = try? await XPostDetailService().fetch(for: item)
+            await resolvePost()
         }
         .fullScreenCover(item: $selectedImage) { image in
             FullScreenImageViewer(item: image)
@@ -87,6 +98,8 @@ private struct XPostReader: View {
 
     private var displayMedia: [XPostMedia] {
         if let detail, !detail.media.isEmpty { return detail.media }
+        if let media = item.media, !media.isEmpty { return media }
+        if item.hasVideoPreview { return [] }
         guard let imageURL = item.imageURL else { return [] }
         return [
             XPostMedia(
@@ -96,6 +109,75 @@ private struct XPostReader: View {
                 aspectRatio: nil
             )
         ]
+    }
+
+    @MainActor
+    private func resolvePost() async {
+        guard !isResolvingMedia else { return }
+        isResolvingMedia = true
+        mediaError = nil
+        do {
+            detail = try await XPostDetailService().fetch(for: item)
+            if item.hasVideoPreview && detail?.media.contains(where: { $0.kind == .video }) != true {
+                mediaError = "The source returned a preview but no playable video stream."
+            }
+        } catch is CancellationError {
+            isResolvingMedia = false
+            return
+        } catch {
+            mediaError = "Video could not load. Tap to retry."
+        }
+        isResolvingMedia = false
+    }
+}
+
+private struct VideoResolutionPanel: View {
+    let previewURL: URL?
+    let isLoading: Bool
+    let message: String?
+    let retry: () -> Void
+
+    var body: some View {
+        Button(action: retry) {
+            ZStack {
+                if let previewURL {
+                    AsyncImage(url: previewURL) { phase in
+                        if case let .success(image) = phase {
+                            image.resizable().scaledToFill()
+                        } else {
+                            Color(uiColor: .secondarySystemBackground)
+                        }
+                    }
+                } else {
+                    Color(uiColor: .secondarySystemBackground)
+                }
+
+                Rectangle().fill(.black.opacity(0.28))
+
+                VStack(spacing: 10) {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                            .controlSize(.large)
+                        Text("Preparing video...")
+                    } else {
+                        Image(systemName: "arrow.clockwise.circle.fill")
+                            .font(.system(size: 46))
+                        Text(message ?? "Tap to load video")
+                    }
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .padding(20)
+            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(16.0 / 9.0, contentMode: .fit)
+            .clipShape(.rect(cornerRadius: 22))
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading)
+        .accessibilityLabel(isLoading ? "Preparing video" : "Retry video")
     }
 }
 

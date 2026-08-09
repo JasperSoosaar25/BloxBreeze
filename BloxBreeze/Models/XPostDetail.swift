@@ -5,8 +5,8 @@ struct XPostDetail: Hashable, Sendable {
     let media: [XPostMedia]
 }
 
-struct XPostMedia: Identifiable, Hashable, Sendable {
-    enum Kind: String, Hashable, Sendable {
+struct XPostMedia: Identifiable, Codable, Hashable, Sendable {
+    enum Kind: String, Codable, Hashable, Sendable {
         case image
         case video
     }

@@ -143,8 +143,8 @@ private struct SourceFilterStrip: View {
     @EnvironmentObject private var store: NewsStore
 
     var body: some View {
-        ScrollView(.horizontal) {
-            LazyHStack(spacing: 10) {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
                 ForEach(NewsSource.all) { source in
                     let selected = store.selectedSourceIDs.contains(source.id)
                     Button {
@@ -162,13 +162,20 @@ private struct SourceFilterStrip: View {
                         .padding(.horizontal, 14)
                         .frame(minHeight: 46)
                         .contentShape(Capsule())
-                        .glassEffect(
-                            .regular.tint(selected ? source.tint.opacity(0.18) : Color.clear).interactive(),
-                            in: Capsule()
-                        )
+                        .background {
+                            Capsule()
+                                .fill(
+                                    selected
+                                        ? source.tint.opacity(0.16)
+                                        : Color(uiColor: .secondarySystemBackground).opacity(0.88)
+                                )
+                        }
                         .overlay {
                             Capsule()
-                                .stroke(selected ? source.tint.opacity(0.42) : Color.clear, lineWidth: 1)
+                                .stroke(
+                                    selected ? source.tint.opacity(0.55) : Color(uiColor: .separator).opacity(0.35),
+                                    lineWidth: 1
+                                )
                                 .allowsHitTesting(false)
                         }
                     }
@@ -178,15 +185,12 @@ private struct SourceFilterStrip: View {
                     .accessibilityHint("Toggles this source in the feed")
                 }
             }
-            .scrollTargetLayout()
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 2)
-            .padding(.vertical, 4)
+            .padding(.vertical, 6)
         }
-        .scrollIndicators(.hidden)
-        .scrollTargetBehavior(.viewAligned)
-        .scrollBounceBehavior(.always, axes: .horizontal)
-        .scrollClipDisabled()
-        .frame(height: 58)
+        .contentShape(Rectangle())
+        .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58, alignment: .leading)
     }
 }
 
