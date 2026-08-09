@@ -43,7 +43,7 @@ struct FreeXFeedService: Sendable {
                 var request = URLRequest(url: url)
                 request.timeoutInterval = 15
                 request.cachePolicy = .reloadRevalidatingCacheData
-                request.setValue("BloxBreeze/1.1 (iOS; free native RSS reader)", forHTTPHeaderField: "User-Agent")
+                request.setValue("BloxBreeze/1.2 (iOS; free native RSS reader)", forHTTPHeaderField: "User-Agent")
 
                 let (data, response) = try await URLSession.shared.data(for: request)
                 guard let http = response as? HTTPURLResponse else { throw FeedError.invalidResponse }
@@ -125,7 +125,7 @@ private final class FreeXFeedDelegate: NSObject, XMLParserDelegate {
 
     private func makeItem() {
         let rawDescription = current["description"] ?? ""
-        let body = rawDescription.nativePlainText
+        let body = rawDescription.nativePostText
         let rawTitle = current["title"]?.nativePlainText ?? body
         let displayText = body.isEmpty ? rawTitle : body
         guard !displayText.isEmpty else { return }
@@ -151,15 +151,19 @@ private final class FreeXFeedDelegate: NSObject, XMLParserDelegate {
     }
 
     private static func firstImageURL(in html: String) -> URL? {
-        guard let regex = try? NSRegularExpression(
-            pattern: #"<img[^>]+src=[\"'](?<url>[^\"']+)[\"']"#,
-            options: [.caseInsensitive]
-        ) else { return nil }
+        let patterns = [
+            #"<img[^>]+src=[\"'](?<url>[^\"']+)[\"']"#,
+            #"<video[^>]+poster=[\"'](?<url>[^\"']+)[\"']"#
+        ]
         let range = NSRange(html.startIndex..<html.endIndex, in: html)
-        guard let match = regex.firstMatch(in: html, range: range),
-              let urlRange = Range(match.range(withName: "url"), in: html) else { return nil }
-        let value = String(html[urlRange]).replacingOccurrences(of: "&amp;", with: "&")
-        return URL(string: value)
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+                  let match = regex.firstMatch(in: html, range: range),
+                  let urlRange = Range(match.range(withName: "url"), in: html) else { continue }
+            let value = String(html[urlRange]).replacingOccurrences(of: "&amp;", with: "&")
+            if let url = URL(string: value) { return url }
+        }
+        return nil
     }
 
     private static func date(from string: String?) -> Date? {
@@ -176,6 +180,47 @@ private final class FreeXFeedDelegate: NSObject, XMLParserDelegate {
 }
 
 private extension String {
+    var nativePostText: String {
+        let primaryHTML: String = {
+            guard let regex = try? NSRegularExpression(
+                pattern: #"<p\b[^>]*>(?<body>.*?)</p>"#,
+                options: [.caseInsensitive, .dotMatchesLineSeparators]
+            ) else { return self }
+            let fullRange = NSRange(startIndex..<endIndex, in: self)
+            guard let match = regex.firstMatch(in: self, range: fullRange),
+                  let range = Range(match.range(withName: "body"), in: self) else { return self }
+            return String(self[range])
+        }()
+
+        var withoutLinkCards = primaryHTML
+        if let anchorRegex = try? NSRegularExpression(
+            pattern: #"<a\b[^>]*>(?<label>.*?)</a>"#,
+            options: [.caseInsensitive, .dotMatchesLineSeparators]
+        ) {
+            let matches = anchorRegex.matches(
+                in: withoutLinkCards,
+                range: NSRange(withoutLinkCards.startIndex..<withoutLinkCards.endIndex, in: withoutLinkCards)
+            )
+            for match in matches.reversed() {
+                guard let wholeRange = Range(match.range, in: withoutLinkCards),
+                      let labelRange = Range(match.range(withName: "label"), in: withoutLinkCards) else { continue }
+                let label = String(withoutLinkCards[labelRange]).nativePlainText
+                let replacement = (label.hasPrefix("@") || label.hasPrefix("#")) ? label : ""
+                withoutLinkCards.replaceSubrange(wholeRange, with: replacement)
+            }
+        }
+
+        return withoutLinkCards.nativePlainText
+            .replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\[?\s*Source:\s*\]?"#, with: "", options: [.regularExpression, .caseInsensitive])
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0.caseInsensitiveCompare("Video") != .orderedSame && $0.caseInsensitiveCompare("Link") != .orderedSame }
+            .joined(separator: "\n\n")
+            .replacingOccurrences(of: "\\n{3,}", with: "\n\n", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var nativePlainText: String {
         replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: [.regularExpression, .caseInsensitive])
             .replacingOccurrences(of: "</p>", with: "\n", options: .caseInsensitive)
@@ -183,10 +228,11 @@ private extension String {
             .replacingOccurrences(of: "&nbsp;", with: " ")
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&apos;", with: "'")
             .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&#x27;", with: "'", options: .caseInsensitive)
             .replacingOccurrences(of: "[ \\t]+", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\n{3,}", with: "\n\n", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
-

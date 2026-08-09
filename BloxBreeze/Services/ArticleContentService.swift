@@ -57,7 +57,7 @@ struct ArticleContentService: Sendable {
     }
 
     private static func parseForum(topic: ForumTopic, post: ForumPost, item: NewsItem) throws -> NativeArticle {
-        let document = try SwiftSoup.parseBodyFragment(post.cooked)
+        let document = try SwiftSoup.parseBodyFragment(normalizeForumEmojiImages(post.cooked))
         guard let body = try document.select("body").first() else {
             throw FeedError.parsing("The official announcement body could not be read.")
         }
@@ -105,6 +105,13 @@ struct ArticleContentService: Sendable {
 
         func addImage(_ image: Element) throws {
             let source = try image.attr("src")
+            let classes = try image.attr("class").lowercased()
+            let altText = try image.attr("alt")
+            if classes.split(separator: " ").contains("emoji") ||
+                source.localizedCaseInsensitiveContains("/emoji/") ||
+                altText.range(of: #"^:[a-z0-9_+\-]+:$"#, options: [.regularExpression, .caseInsensitive]) != nil {
+                return
+            }
             let rawSource: String
             if source.isEmpty {
                 rawSource = try image.attr("data-src")
@@ -169,7 +176,7 @@ struct ArticleContentService: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 30
         request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("BloxBreeze/1.1 (iOS; native article reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("BloxBreeze/1.2 (iOS; native article reader)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw FeedError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
@@ -194,6 +201,61 @@ struct ArticleContentService: Sendable {
         if let value = formatter.date(from: string) { return value }
         formatter.formatOptions = [.withInternetDateTime]
         return formatter.date(from: string)
+    }
+
+    static func normalizeForumEmojiImages(_ html: String) -> String {
+        guard let imageRegex = try? NSRegularExpression(
+            pattern: #"<img\b[^>]*>"#,
+            options: [.caseInsensitive, .dotMatchesLineSeparators]
+        ), let nameRegex = try? NSRegularExpression(
+            pattern: #"(?:title|alt)=[\"']:(?<name>[a-z0-9_+\-]+):[\"']"#,
+            options: [.caseInsensitive]
+        ) else { return html }
+
+        var result = html
+        let imageMatches = imageRegex.matches(
+            in: result,
+            range: NSRange(result.startIndex..<result.endIndex, in: result)
+        )
+
+        for imageMatch in imageMatches.reversed() {
+            guard let imageRange = Range(imageMatch.range, in: result) else { continue }
+            let tag = String(result[imageRange])
+            let lowercased = tag.lowercased()
+
+            let tagRange = NSRange(tag.startIndex..<tag.endIndex, in: tag)
+            let name = nameRegex.firstMatch(in: tag, range: tagRange).flatMap { match -> String? in
+                guard let range = Range(match.range(withName: "name"), in: tag) else { return nil }
+                return String(tag[range]).lowercased()
+            }
+            let isEmoji = lowercased.contains("class=\"emoji") ||
+                lowercased.contains("class='emoji") ||
+                lowercased.contains("/emoji/") ||
+                name != nil
+            guard isEmoji else { continue }
+            let replacement = name.map { forumEmoji(named: $0) } ?? ""
+            result.replaceSubrange(imageRange, with: replacement)
+        }
+        return result
+    }
+
+    private static func forumEmoji(named name: String) -> String {
+        let replacements: [String: String] = [
+            "star2": "🌟",
+            "sparkles": "✨",
+            "tada": "🎉",
+            "rocket": "🚀",
+            "fire": "🔥",
+            "heart": "❤️",
+            "eyes": "👀",
+            "wave": "👋",
+            "warning": "⚠️",
+            "white_check_mark": "✅",
+            "information_source": "ℹ️",
+            "bulb": "💡",
+            "zap": "⚡"
+        ]
+        return replacements[name] ?? ":\(name):"
     }
 }
 

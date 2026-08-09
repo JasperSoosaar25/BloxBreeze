@@ -7,20 +7,34 @@ struct NewsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let imageURL = item.imageURL {
-                AsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case let .success(image):
-                        image.resizable().scaledToFill()
-                    case .failure:
-                        imagePlaceholder
-                    default:
-                        ZStack {
+                ZStack {
+                    AsyncImage(url: imageURL) { phase in
+                        switch phase {
+                        case let .success(image):
+                            image.resizable().scaledToFill()
+                        case .failure:
                             imagePlaceholder
-                            ProgressView()
+                        default:
+                            ZStack {
+                                imagePlaceholder
+                                ProgressView()
+                            }
                         }
                     }
+
+                    if looksLikeVideo {
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .frame(width: 52, height: 52)
+                            .overlay {
+                                Image(systemName: "play.fill")
+                                    .font(.headline.bold())
+                                    .foregroundStyle(.white)
+                                    .offset(x: 1)
+                            }
+                    }
                 }
-                .frame(height: 176)
+                .frame(height: 156)
                 .frame(maxWidth: .infinity)
                 .clipped()
             }
@@ -47,13 +61,15 @@ struct NewsCard: View {
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                if item.isFromX {
-                    Text(item.body)
+                if let cardSummary {
+                    Text(verbatim: cardSummary)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.leading)
                         .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 HStack(spacing: 12) {
@@ -66,8 +82,10 @@ struct NewsCard: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.clear)
         .clipShape(.rect(cornerRadius: 26))
         .breezeGlass(cornerRadius: 26, tint: item.source.tint.opacity(0.055), interactive: true)
@@ -86,6 +104,22 @@ struct NewsCard: View {
                 .font(.system(size: 36))
                 .foregroundStyle(.white.opacity(0.85))
         }
+    }
+
+    private var cardSummary: String? {
+        guard item.isFromX else { return nil }
+        let paragraphs = item.body
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard paragraphs.count > 1 else { return nil }
+        let remainder = paragraphs.dropFirst().joined(separator: "\n\n")
+        return remainder.isEmpty ? nil : remainder
+    }
+
+    private var looksLikeVideo: Bool {
+        guard let value = item.imageURL?.absoluteString.lowercased() else { return false }
+        return value.contains("video_thumb") || value.contains("amplify_video_thumb")
     }
 }
 

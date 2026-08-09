@@ -16,7 +16,8 @@ The three public X feeds arrive through free Nitter RSS mirrors. No X account, d
 
 - Native SwiftUI navigation, tab bar, sheets, forms, search, and iOS 26 Liquid Glass
 - Native reader for Roblox Newsroom and Developer Forum text and images - no `WKWebView`
-- Native X post view populated by free RSS
+- Clean native X post view populated by free RSS, with link-preview clutter removed
+- Full-screen pinch/double-tap image zoom and native AVKit video playback
 - Pull to refresh, source filters, search, read/unread state, and offline feed cache
 - Saved stories, gentle reading streak, light/dark mode, cozy color mode, Dynamic Type, and VoiceOver labels
 - Original non-brand app icon and a clear independent-app disclaimer
@@ -53,7 +54,7 @@ BloxBreeze itself has no subscription or paid service. Signing availability, dev
 
 ## Project notes
 
-- App version: 1.1.0
+- App version: 1.2.0
 - Deployment target: iOS 26.0
 - Device family: iPhone
 - Bundle identifier: `com.jasper.bloxbreeze` (safe to change in `project.yml`)

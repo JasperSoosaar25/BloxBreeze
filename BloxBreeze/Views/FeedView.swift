@@ -35,10 +35,12 @@ struct FeedView: View {
                                     NewsCard(item: item)
                                 }
                                 .buttonStyle(.plain)
+                                .frame(maxWidth: .infinity)
                             }
                         }
                     }
                     .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity)
                     .padding(.top, 10)
                     .padding(.bottom, 100)
                 }
@@ -142,34 +144,49 @@ private struct SourceFilterStrip: View {
 
     var body: some View {
         ScrollView(.horizontal) {
-            GlassEffectContainer(spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(NewsSource.all) { source in
-                        let selected = store.selectedSourceIDs.contains(source.id)
-                        Button {
-                            withAnimation(.snappy) { store.toggleSource(source) }
-                        } label: {
-                            HStack(spacing: 7) {
-                                Image(systemName: source.symbol)
-                                Text(source.name)
-                            }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(selected ? source.tint : Color(uiColor: .secondaryLabel))
-                            .padding(.horizontal, 13)
-                            .padding(.vertical, 9)
-                            .contentShape(Capsule())
+            LazyHStack(spacing: 10) {
+                ForEach(NewsSource.all) { source in
+                    let selected = store.selectedSourceIDs.contains(source.id)
+                    Button {
+                        withAnimation(.snappy) {
+                            store.toggleSource(source)
                         }
-                        .buttonStyle(.plain)
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: selected ? "checkmark" : source.symbol)
+                            Text(source.name)
+                                .lineLimit(1)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(selected ? source.tint : Color(uiColor: .secondaryLabel))
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 46)
+                        .contentShape(Capsule())
                         .glassEffect(
-                            .regular.tint(selected ? source.tint.opacity(0.16) : .clear).interactive()
+                            .regular.tint(selected ? source.tint.opacity(0.18) : Color.clear).interactive(),
+                            in: Capsule()
                         )
-                        .accessibilityValue(selected ? "Included" : "Hidden")
+                        .overlay {
+                            Capsule()
+                                .stroke(selected ? source.tint.opacity(0.42) : Color.clear, lineWidth: 1)
+                                .allowsHitTesting(false)
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(source.name)
+                    .accessibilityValue(selected ? "Included" : "Hidden")
+                    .accessibilityHint("Toggles this source in the feed")
                 }
             }
-            .padding(.vertical, 2)
+            .scrollTargetLayout()
+            .padding(.horizontal, 2)
+            .padding(.vertical, 4)
         }
         .scrollIndicators(.hidden)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollBounceBehavior(.always, axes: .horizontal)
+        .scrollClipDisabled()
+        .frame(height: 58)
     }
 }
 

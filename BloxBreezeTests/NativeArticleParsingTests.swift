@@ -39,4 +39,17 @@ final class NativeArticleParsingTests: XCTestCase {
         XCTAssertTrue(article.blocks.contains { $0.kind == .quote && $0.text == "A useful quote." })
         XCTAssertTrue(article.blocks.contains { $0.kind == .image && $0.imageURL?.absoluteString == "https://about.roblox.com/images/detail.png" })
     }
+
+    func testForumEmojiImageBecomesUnicode() {
+        let html = #"""
+        <p>A cozy update <img src="/images/emoji/twitter/star2.png" class="emoji" title=":star2:" alt=":star2:" width="20" height="20"> today.</p>
+        <img src="https://cdn.example.com/full-size-story.png" alt="Story art">
+        """#
+
+        let normalized = ArticleContentService.normalizeForumEmojiImages(html)
+
+        XCTAssertTrue(normalized.contains("A cozy update 🌟 today."))
+        XCTAssertTrue(normalized.contains("full-size-story.png"))
+        XCTAssertFalse(normalized.contains(":star2:"))
+    }
 }

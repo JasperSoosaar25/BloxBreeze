@@ -22,9 +22,11 @@ struct SavedView: View {
                                     NewsCard(item: item)
                                 }
                                 .buttonStyle(.plain)
+                                .frame(maxWidth: .infinity)
                             }
                         }
                         .padding(16)
+                        .frame(maxWidth: .infinity)
                         .padding(.bottom, 90)
                     }
                 }
@@ -36,4 +38,3 @@ struct SavedView: View {
         }
     }
 }
-

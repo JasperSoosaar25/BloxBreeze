@@ -30,6 +30,8 @@ struct ArticleDetailView: View {
 
 private struct XPostReader: View {
     let item: NewsItem
+    @State private var detail: XPostDetail?
+    @State private var selectedImage: ZoomableImageItem?
 
     var body: some View {
         ZStack {
@@ -39,13 +41,21 @@ private struct XPostReader: View {
                 VStack(alignment: .leading, spacing: 20) {
                     SourceBadge(source: item.source)
 
-                    Text(verbatim: item.body)
-                        .font(.title2)
-                        .fontWeight(.medium)
+                    Text(verbatim: detail?.text ?? item.body)
+                        .font(.body)
+                        .lineSpacing(6)
+                        .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
 
-                    if let imageURL = item.imageURL {
-                        NativeRemoteImage(url: imageURL)
+                    ForEach(displayMedia) { media in
+                        switch media.kind {
+                        case .image:
+                            RemoteMediaImage(url: media.url) {
+                                selectedImage = ZoomableImageItem(url: media.url)
+                            }
+                        case .video:
+                            InlineVideoView(media: media)
+                        }
                     }
 
                     if let metrics = item.metrics {
@@ -62,10 +72,30 @@ private struct XPostReader: View {
 
                     NativeReaderNotice(text: "Free RSS post - links are plain text and cannot open a browser.")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(18)
                 .padding(.bottom, 90)
             }
         }
+        .task(id: item.id) {
+            detail = try? await XPostDetailService().fetch(for: item)
+        }
+        .fullScreenCover(item: $selectedImage) { image in
+            FullScreenImageViewer(item: image)
+        }
+    }
+
+    private var displayMedia: [XPostMedia] {
+        if let detail, !detail.media.isEmpty { return detail.media }
+        guard let imageURL = item.imageURL else { return [] }
+        return [
+            XPostMedia(
+                kind: .image,
+                url: imageURL,
+                previewURL: imageURL,
+                aspectRatio: nil
+            )
+        ]
     }
 }
 
@@ -75,6 +105,7 @@ private struct NativeArticleReader: View {
     @State private var article: NativeArticle?
     @State private var errorMessage: String?
     @State private var isLoading = true
+    @State private var selectedImage: ZoomableImageItem?
 
     var body: some View {
         ZStack {
@@ -107,6 +138,9 @@ private struct NativeArticleReader: View {
             }
         }
         .task(id: item.id) { await load() }
+        .fullScreenCover(item: $selectedImage) { image in
+            FullScreenImageViewer(item: image)
+        }
     }
 
     private func articleBody(_ article: NativeArticle) -> some View {
@@ -115,7 +149,9 @@ private struct NativeArticleReader: View {
                 SourceBadge(source: item.source)
 
                 if let heroImageURL = article.heroImageURL {
-                    NativeRemoteImage(url: heroImageURL)
+                    RemoteMediaImage(url: heroImageURL) {
+                        selectedImage = ZoomableImageItem(url: heroImageURL)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -144,7 +180,9 @@ private struct NativeArticleReader: View {
                 }
 
                 ForEach(article.blocks) { block in
-                    NativeArticleBlockView(block: block)
+                    NativeArticleBlockView(block: block) { imageURL in
+                        selectedImage = ZoomableImageItem(url: imageURL)
+                    }
                 }
 
                 NativeReaderNotice(
@@ -154,6 +192,7 @@ private struct NativeArticleReader: View {
                 )
                 .padding(.top, 8)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(18)
             .padding(.bottom, 90)
         }
@@ -179,6 +218,7 @@ private struct NativeArticleReader: View {
 
 private struct NativeArticleBlockView: View {
     let block: NativeArticleBlock
+    let onImageTap: (URL) -> Void
 
     var body: some View {
         switch block.kind {
@@ -188,6 +228,7 @@ private struct NativeArticleBlockView: View {
                     .font(headingFont)
                     .fontWeight(.bold)
                     .padding(.top, 8)
+                    .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }
         case .paragraph:
@@ -195,6 +236,7 @@ private struct NativeArticleBlockView: View {
                 Text(verbatim: text)
                     .font(.body)
                     .lineSpacing(6)
+                    .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }
         case .bullet:
@@ -205,6 +247,7 @@ private struct NativeArticleBlockView: View {
                         .frame(width: 7, height: 7)
                     Text(verbatim: text)
                         .lineSpacing(5)
+                        .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                 }
                 .padding(.leading, 6)
@@ -218,6 +261,7 @@ private struct NativeArticleBlockView: View {
                     Text(verbatim: text)
                         .font(.body.italic())
                         .lineSpacing(5)
+                        .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                 }
                 .padding(18)
@@ -226,7 +270,9 @@ private struct NativeArticleBlockView: View {
         case .image:
             if let imageURL = block.imageURL {
                 VStack(alignment: .leading, spacing: 8) {
-                    NativeRemoteImage(url: imageURL)
+                    RemoteMediaImage(url: imageURL) {
+                        onImageTap(imageURL)
+                    }
                     if let caption = block.caption {
                         Text(verbatim: caption)
                             .font(.caption)
@@ -243,30 +289,6 @@ private struct NativeArticleBlockView: View {
         case 3: return .title3
         default: return .headline
         }
-    }
-}
-
-private struct NativeRemoteImage: View {
-    let url: URL
-
-    var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case let .success(image):
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity)
-            case .failure:
-                ContentUnavailableView("Image unavailable", systemImage: "photo")
-                    .frame(maxWidth: .infinity, minHeight: 180)
-            default:
-                ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 180)
-            }
-        }
-        .clipShape(.rect(cornerRadius: 24))
-        .accessibilityLabel("Story image")
     }
 }
 
