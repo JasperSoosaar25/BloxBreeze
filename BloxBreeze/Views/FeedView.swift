@@ -12,10 +12,7 @@ struct FeedView: View {
                     LazyVStack(spacing: 18) {
                         CozyDigestCard()
                         SourceFilterStrip()
-
-                        if !store.hasXToken {
-                            XConnectionNudge()
-                        }
+                        FreeFeedsNote()
 
                         if let status = store.statusMessage {
                             FeedNotice(text: status)
@@ -74,24 +71,24 @@ struct FeedView: View {
     }
 }
 
-private struct XConnectionNudge: View {
+private struct FreeFeedsNote: View {
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "key.fill")
-                .foregroundStyle(Color.breezeLavender)
+            Image(systemName: "leaf.fill")
+                .foregroundStyle(Color.breezeMint)
                 .frame(width: 30, height: 30)
-                .glassEffect(.regular.tint(Color.breezeLavender.opacity(0.14)), in: Circle())
+                .glassEffect(.regular.tint(Color.breezeMint.opacity(0.14)), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text("Bring in your three X sources")
+                Text("Every source is free")
                     .font(.subheadline.weight(.semibold))
-                Text("Add an X bearer token in Settings; the official Roblox feeds already work without one.")
+                Text("The three X accounts arrive through free RSS mirrors—no login, token, or subscription.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
         .padding(14)
-        .breezeGlass(cornerRadius: 20, tint: Color.breezeLavender.opacity(0.06))
+        .breezeGlass(cornerRadius: 20, tint: Color.breezeMint.opacity(0.06))
     }
 }
 

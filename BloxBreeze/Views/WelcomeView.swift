@@ -28,7 +28,8 @@ struct WelcomeView: View {
 
                 VStack(alignment: .leading, spacing: 18) {
                     WelcomeRow(symbol: "checkmark.seal.fill", color: Color.breezeCoral, title: "Official first", detail: "Roblox Newsroom and creator announcements work right away.")
-                    WelcomeRow(symbol: "rectangle.stack.fill", color: Color.breezeLavender, title: "Read it here", detail: "Stories stay inside the app, with outside links disabled.")
+                    WelcomeRow(symbol: "rectangle.stack.fill", color: Color.breezeLavender, title: "Actually native", detail: "Read clean text and images here - never an embedded webpage.")
+                    WelcomeRow(symbol: "leaf.fill", color: Color.breezeMint, title: "Completely free", detail: "No paid API, subscription, account, or secret token needed.")
                     WelcomeRow(symbol: "heart.fill", color: Color.breezePeach, title: "Made cozy", detail: "Save stories, search everything, cache news, and keep a gentle reading streak.")
                 }
                 .padding(22)

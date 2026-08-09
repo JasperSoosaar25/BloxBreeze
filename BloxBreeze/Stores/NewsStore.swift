@@ -18,7 +18,7 @@ final class NewsStore: ObservableObject {
 
     private let newsroomService = RobloxNewsroomService()
     private let developerService = DeveloperForumService()
-    private let xService = XAPIService()
+    private let freeXFeedService = FreeXFeedService()
 
     private enum Keys {
         static let cache = "news-cache-v1"
@@ -45,11 +45,6 @@ final class NewsStore: ObservableObject {
         savedIDs = Set(Self.decode([String].self, key: Keys.savedIDs) ?? [])
         readIDs = Set(Self.decode([String].self, key: Keys.readIDs) ?? [])
         readingDays = Set(Self.decode([String].self, key: Keys.readingDays) ?? [])
-    }
-
-    var hasXToken: Bool {
-        guard let token = SecureTokenStore.read() else { return false }
-        return !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var filteredItems: [NewsItem] {
@@ -101,12 +96,10 @@ final class NewsStore: ObservableObject {
             messages.append("Creator Updates: \(error.localizedDescription)")
         }
 
-        if let token = SecureTokenStore.read(), !token.isEmpty {
-            do {
-                fresh.append(contentsOf: try await xService.fetch(token: token))
-            } catch {
-                messages.append("X: \(error.localizedDescription)")
-            }
+        do {
+            fresh.append(contentsOf: try await freeXFeedService.fetch())
+        } catch {
+            messages.append("Free X feeds: \(error.localizedDescription)")
         }
 
         if !fresh.isEmpty {
@@ -119,19 +112,6 @@ final class NewsStore: ObservableObject {
         }
 
         statusMessage = messages.isEmpty ? nil : messages.joined(separator: "\n")
-    }
-
-    func saveXToken(_ token: String) async throws {
-        let cleanToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanToken.isEmpty else { throw FeedError.missingXToken }
-        try await xService.validate(token: cleanToken)
-        try SecureTokenStore.write(cleanToken)
-        await refresh()
-    }
-
-    func removeXToken() throws {
-        try SecureTokenStore.delete(ignoringMissing: true)
-        statusMessage = nil
     }
 
     func toggleSource(_ source: NewsSource) {

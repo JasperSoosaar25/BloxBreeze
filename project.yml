@@ -10,6 +10,10 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     TARGETED_DEVICE_FAMILY: "1"
     ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+packages:
+  SwiftSoup:
+    url: https://github.com/scinfu/SwiftSoup.git
+    exactVersion: 2.13.5
 targets:
   BloxBreeze:
     type: application
@@ -30,6 +34,8 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         SUPPORTS_MACCATALYST: NO
         ENABLE_PREVIEWS: YES
+    dependencies:
+      - package: SwiftSoup
     scheme:
       gatherCoverageData: true
       testTargets:

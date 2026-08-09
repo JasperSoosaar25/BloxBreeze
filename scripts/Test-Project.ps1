@@ -7,6 +7,8 @@ $requiredFiles = @(
     'BloxBreeze/Resources/PrivacyInfo.xcprivacy',
     'BloxBreeze/Resources/Assets.xcassets/AppIcon.appiconset/BloxBreezeIcon.png',
     'BloxBreeze/BloxBreezeApp.swift',
+    'BloxBreeze/Services/FreeXFeedService.swift',
+    'BloxBreeze/Services/ArticleContentService.swift',
     '.github/workflows/build-unsigned-ipa.yml'
 )
 
@@ -42,6 +44,16 @@ if ($possibleSecrets) {
 $externalOpeners = $swift | Select-String -Pattern 'UIApplication\.shared\.open|openURL\(|SFSafariViewController'
 if ($externalOpeners) {
     throw 'An external URL opener was found; stories must remain in the app.'
+}
+
+$browserCode = $swift | Select-String -Pattern 'import WebKit|WKWebView|ReaderWebView'
+if ($browserCode) {
+    throw 'An embedded browser was found; article content must use native SwiftUI views.'
+}
+
+$paidXFlow = $swift | Select-String -Pattern 'XAPIService|SecureTokenStore|api\.x\.com|developer\.x\.com'
+if ($paidXFlow) {
+    throw 'A paid/token-based X API flow was found; X sources must remain free and keyless.'
 }
 
 Add-Type -AssemblyName System.Drawing
