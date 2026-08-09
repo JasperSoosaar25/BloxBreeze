@@ -22,12 +22,20 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          SIMULATOR_ID="$(xcrun simctl list devices available -j | python3 -c 'import json, sys; devices = json.load(sys.stdin)["devices"]; phones = [device for runtime in devices.values() for device in runtime if device.get("isAvailable", True) and device.get("name", "").startswith("iPhone")]; print(next((device["udid"] for device in phones if "Pro" in device["name"]), phones[0]["udid"]))')"
+          test -n "$SIMULATOR_ID"
+          echo "Using iPhone simulator $SIMULATOR_ID"
+          echo "id=$SIMULATOR_ID" >> "$GITHUB_OUTPUT"
+
       - name: Run unit tests
         run: >-
           xcodebuild test
           -project BloxBreeze.xcodeproj
           -scheme BloxBreeze
-          -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest'
+          -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}'
           CODE_SIGNING_ALLOWED=NO
 
       - name: Build unsigned device app
@@ -56,4 +64,3 @@ jobs:
           name: BloxBreeze-unsigned-ipa
           path: BloxBreeze-unsigned.ipa
           if-no-files-found: error
-
