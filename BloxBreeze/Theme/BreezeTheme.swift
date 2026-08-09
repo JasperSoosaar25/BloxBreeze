@@ -10,11 +10,11 @@ extension Color {
 extension NewsSource {
     var tint: Color {
         switch id {
-        case NewsSource.robloxNewsroom.id: return .breezeCoral
-        case NewsSource.developerForum.id: return .breezeMint
-        case NewsSource.robloxRTC.id: return .breezeLavender
+        case NewsSource.robloxNewsroom.id: return Color.breezeCoral
+        case NewsSource.developerForum.id: return Color.breezeMint
+        case NewsSource.robloxRTC.id: return Color.breezeLavender
         case NewsSource.bloxyNews.id: return .blue
-        default: return .breezePeach
+        default: return Color.breezePeach
         }
     }
 }
@@ -29,7 +29,7 @@ struct BreezeBackground: View {
 
             LinearGradient(
                 colors: cozyMode
-                    ? [.breezeLavender.opacity(colorScheme == .dark ? 0.18 : 0.24), .breezePeach.opacity(0.16), .clear]
+                    ? [Color.breezeLavender.opacity(colorScheme == .dark ? 0.18 : 0.24), Color.breezePeach.opacity(0.16), Color.clear]
                     : [.blue.opacity(0.12), .cyan.opacity(0.08), .clear],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

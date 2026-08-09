@@ -107,7 +107,7 @@ private struct MetricsBar: View {
         .breezeGlass(cornerRadius: 22, tint: itemTint)
     }
 
-    private var itemTint: Color { .breezeLavender.opacity(0.08) }
+    private var itemTint: Color { Color.breezeLavender.opacity(0.08) }
 }
 
 private struct Metric: View {

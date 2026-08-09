@@ -78,9 +78,9 @@ private struct XConnectionNudge: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "key.fill")
-                .foregroundStyle(.breezeLavender)
+                .foregroundStyle(Color.breezeLavender)
                 .frame(width: 30, height: 30)
-                .glassEffect(.regular.tint(.breezeLavender.opacity(0.14)), in: Circle())
+                .glassEffect(.regular.tint(Color.breezeLavender.opacity(0.14)), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text("Bring in your three X sources")
                     .font(.subheadline.weight(.semibold))
@@ -91,7 +91,7 @@ private struct XConnectionNudge: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .breezeGlass(cornerRadius: 20, tint: .breezeLavender.opacity(0.06))
+        .breezeGlass(cornerRadius: 20, tint: Color.breezeLavender.opacity(0.06))
     }
 }
 
@@ -121,7 +121,7 @@ private struct CozyDigestCard: View {
                 Image(systemName: "cloud.sun.fill")
                     .font(.title)
                     .symbolRenderingMode(.palette)
-                    .foregroundStyle(.breezePeach, .breezeLavender)
+                    .foregroundStyle(Color.breezePeach, Color.breezeLavender)
             }
 
             HStack(spacing: 18) {
@@ -136,7 +136,7 @@ private struct CozyDigestCard: View {
             .foregroundStyle(.secondary)
         }
         .padding(20)
-        .breezeGlass(cornerRadius: 28, tint: .breezeLavender.opacity(0.10))
+        .breezeGlass(cornerRadius: 28, tint: Color.breezeLavender.opacity(0.10))
     }
 }
 
@@ -182,13 +182,13 @@ private struct FeedNotice: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "info.circle.fill")
-                .foregroundStyle(.breezePeach)
+                .foregroundStyle(Color.breezePeach)
             Text(text)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
         }
         .padding(14)
-        .breezeGlass(cornerRadius: 18, tint: .breezePeach.opacity(0.08))
+        .breezeGlass(cornerRadius: 18, tint: Color.breezePeach.opacity(0.08))
     }
 }

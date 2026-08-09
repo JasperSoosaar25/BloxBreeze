@@ -19,8 +19,7 @@ struct BloxBreezeApp: App {
                     }
                 }
             }
-            .tint(.breezeCoral)
+            .tint(Color.breezeCoral)
         }
     }
 }
-

@@ -31,7 +31,7 @@ struct NewsCard: View {
                     Spacer()
                     if store.savedIDs.contains(item.id) {
                         Image(systemName: "heart.fill")
-                            .foregroundStyle(.breezeCoral)
+                            .foregroundStyle(Color.breezeCoral)
                             .accessibilityLabel("Saved")
                     }
                     if !store.readIDs.contains(item.id) {
@@ -105,4 +105,3 @@ struct SourceBadge: View {
         .foregroundStyle(source.tint)
     }
 }
-

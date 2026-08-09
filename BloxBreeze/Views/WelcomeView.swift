@@ -14,7 +14,7 @@ struct WelcomeView: View {
                     .font(.system(size: 66, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 132, height: 132)
-                    .glassEffect(.regular.tint(.breezeCoral).interactive(), in: .rect(cornerRadius: 34))
+                    .glassEffect(.regular.tint(Color.breezeCoral).interactive(), in: .rect(cornerRadius: 34))
                     .accessibilityHidden(true)
 
                 VStack(spacing: 10) {
@@ -27,9 +27,9 @@ struct WelcomeView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 18) {
-                    WelcomeRow(symbol: "checkmark.seal.fill", color: .breezeCoral, title: "Official first", detail: "Roblox Newsroom and creator announcements work right away.")
-                    WelcomeRow(symbol: "rectangle.stack.fill", color: .breezeLavender, title: "Read it here", detail: "Stories stay inside the app, with outside links disabled.")
-                    WelcomeRow(symbol: "heart.fill", color: .breezePeach, title: "Made cozy", detail: "Save stories, search everything, cache news, and keep a gentle reading streak.")
+                    WelcomeRow(symbol: "checkmark.seal.fill", color: Color.breezeCoral, title: "Official first", detail: "Roblox Newsroom and creator announcements work right away.")
+                    WelcomeRow(symbol: "rectangle.stack.fill", color: Color.breezeLavender, title: "Read it here", detail: "Stories stay inside the app, with outside links disabled.")
+                    WelcomeRow(symbol: "heart.fill", color: Color.breezePeach, title: "Made cozy", detail: "Save stories, search everything, cache news, and keep a gentle reading streak.")
                 }
                 .padding(22)
                 .breezeGlass(cornerRadius: 28, tint: .white.opacity(0.05))
@@ -73,4 +73,3 @@ private struct WelcomeRow: View {
         }
     }
 }
-
