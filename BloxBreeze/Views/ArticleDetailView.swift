@@ -272,7 +272,7 @@ private struct NativePDFReader: View {
             var request = URLRequest(url: url)
             request.timeoutInterval = 45
             request.cachePolicy = .returnCacheDataElseLoad
-            request.setValue("BloxBreeze/1.5 (iOS; native document reader)", forHTTPHeaderField: "User-Agent")
+            request.setValue("BloxBreeze/1.6 (iOS; native document reader)", forHTTPHeaderField: "User-Agent")
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode),

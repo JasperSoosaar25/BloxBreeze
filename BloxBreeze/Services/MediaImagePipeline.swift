@@ -28,7 +28,7 @@ actor MediaImagePipeline {
                     forHTTPHeaderField: "Accept"
                 )
                 request.setValue(
-                    "BloxBreeze/1.5 (iPhone; native high-quality media reader)",
+                    "BloxBreeze/1.6 (iPhone; native high-quality media reader)",
                     forHTTPHeaderField: "User-Agent"
                 )
 

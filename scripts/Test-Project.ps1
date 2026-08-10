@@ -54,6 +54,12 @@ if ($browserCode) {
     throw 'An embedded browser was found; article content must use native SwiftUI views.'
 }
 
+$mediaViews = Get-Content -Raw -LiteralPath (Join-Path $root 'BloxBreeze/Views/Components/NativeMediaViews.swift')
+if ($mediaViews -notmatch 'FullScreenVideoPlayer' -or
+    $mediaViews -notmatch 'fullScreenCover\(isPresented: \$isFullScreen\)') {
+    throw 'The native video player must retain its full-screen presentation.'
+}
+
 $paidXFlow = $swift | Select-String -Pattern 'XAPIService|SecureTokenStore|api\.x\.com|developer\.x\.com'
 if ($paidXFlow) {
     throw 'A paid/token-based X API flow was found; X sources must remain free and keyless.'

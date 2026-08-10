@@ -73,57 +73,128 @@ struct RemoteMediaImage: View {
 struct InlineVideoView: View {
     let media: XPostMedia
     @State private var player: AVPlayer?
+    @State private var isFullScreen = false
 
     var body: some View {
-        Group {
-            if let player {
-                VideoPlayer(player: player)
-            } else {
-                Button {
-                    let newPlayer = AVPlayer(url: media.url)
-                    player = newPlayer
-                    newPlayer.play()
-                } label: {
-                    ZStack {
-                        if let previewURL = media.previewURL {
-                            HighQualityAsyncImage(url: previewURL) { phase in
-                                if case let .success(image) = phase {
-                                    NativeUIImageView(image: image, contentMode: .scaleAspectFill)
-                                } else {
-                                    Color(uiColor: .secondarySystemBackground)
-                                }
-                            }
-                        } else {
-                            Color(uiColor: .secondarySystemBackground)
-                        }
+        ZStack(alignment: .topTrailing) {
+            playbackSurface
 
-                        Rectangle().fill(.black.opacity(0.18))
-
-                        VStack(spacing: 8) {
-                            Image(systemName: "play.fill")
-                                .font(.title2.bold())
-                                .foregroundStyle(.white)
-                                .offset(x: 2)
-                                .frame(width: 64, height: 64)
-                                .glassEffect(
-                                    .regular.tint(.black.opacity(0.22)).interactive(),
-                                    in: Circle()
-                                )
-                            Text("Play video")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.white)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Play video")
+            Button(action: presentFullScreen) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.white)
+                    .frame(width: 42, height: 42)
+                    .glassEffect(
+                        .regular.tint(.black.opacity(0.22)).interactive(),
+                        in: Circle()
+                    )
             }
+            .buttonStyle(.plain)
+            .padding(10)
+            .accessibilityLabel("Play video full screen")
         }
         .aspectRatio(CGFloat(media.aspectRatio ?? (16.0 / 9.0)), contentMode: .fit)
         .frame(maxWidth: .infinity, maxHeight: 430)
         .background(.black)
         .clipShape(.rect(cornerRadius: 22))
+        .fullScreenCover(isPresented: $isFullScreen) {
+            if let player {
+                FullScreenVideoPlayer(player: player)
+            }
+        }
         .onDisappear { player?.pause() }
+    }
+
+    @ViewBuilder
+    private var playbackSurface: some View {
+        if let player {
+            VideoPlayer(player: player)
+        } else {
+            Button(action: startPlayback) {
+                ZStack {
+                    if let previewURL = media.previewURL {
+                        HighQualityAsyncImage(url: previewURL) { phase in
+                            if case let .success(image) = phase {
+                                NativeUIImageView(image: image, contentMode: .scaleAspectFill)
+                            } else {
+                                Color(uiColor: .secondarySystemBackground)
+                            }
+                        }
+                    } else {
+                        Color(uiColor: .secondarySystemBackground)
+                    }
+
+                    Rectangle().fill(.black.opacity(0.18))
+
+                    VStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                            .font(.title2.bold())
+                            .foregroundStyle(.white)
+                            .offset(x: 2)
+                            .frame(width: 64, height: 64)
+                            .glassEffect(
+                                .regular.tint(.black.opacity(0.22)).interactive(),
+                                in: Circle()
+                            )
+                        Text("Play video")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Play video")
+        }
+    }
+
+    private func startPlayback() {
+        activePlayer().play()
+    }
+
+    private func presentFullScreen() {
+        activePlayer().play()
+        isFullScreen = true
+    }
+
+    private func activePlayer() -> AVPlayer {
+        if let player { return player }
+        let newPlayer = AVPlayer(url: media.url)
+        player = newPlayer
+        return newPlayer
+    }
+}
+
+private struct FullScreenVideoPlayer: View {
+    @Environment(\.dismiss) private var dismiss
+    let player: AVPlayer
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VideoPlayer(player: player)
+                .ignoresSafeArea()
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.headline.bold())
+                    .foregroundStyle(.white)
+                    .frame(width: 46, height: 46)
+                    .glassEffect(
+                        .regular.tint(.black.opacity(0.24)).interactive(),
+                        in: Circle()
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 10)
+            .padding(.trailing, 14)
+            .accessibilityLabel("Close full-screen video")
+        }
+        .statusBarHidden(true)
+        .onAppear { player.play() }
     }
 }
 
