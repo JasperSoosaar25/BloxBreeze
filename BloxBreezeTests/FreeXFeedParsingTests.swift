@@ -58,6 +58,10 @@ final class FreeXFeedParsingTests: XCTestCase {
             "2086215099573010915"
         )
         XCTAssertEqual(
+            XPostDetailService.statusID(in: "x:2086215099573010915"),
+            "2086215099573010915"
+        )
+        XCTAssertEqual(
             XPostDetailService.cleanPostText("A tidy post https://t.co/example"),
             "A tidy post"
         )

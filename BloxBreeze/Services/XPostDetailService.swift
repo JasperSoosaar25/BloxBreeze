@@ -17,7 +17,7 @@ struct XPostDetailService: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
         request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("BloxBreeze/1.3 (iOS; native media reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("BloxBreeze/1.3.1 (iOS; native media reader)", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse,
@@ -44,13 +44,19 @@ struct XPostDetailService: Sendable {
     }
 
     static func statusID(in value: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: #"/status/(\d+)"#),
-              let match = regex.firstMatch(
-                in: value,
-                range: NSRange(value.startIndex..<value.endIndex, in: value)
-              ),
-              let range = Range(match.range(at: 1), in: value) else { return nil }
-        return String(value[range])
+        let patterns = [
+            #"/status/(\d+)"#,
+            #"(?:^|[^0-9])(\d{10,22})(?:$|[^0-9])"#
+        ]
+        let searchRange = NSRange(value.startIndex..<value.endIndex, in: value)
+
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern),
+                  let match = regex.firstMatch(in: value, range: searchRange),
+                  let range = Range(match.range(at: 1), in: value) else { continue }
+            return String(value[range])
+        }
+        return nil
     }
 
     static func cleanPostText(_ value: String) -> String {

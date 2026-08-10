@@ -43,7 +43,7 @@ struct FreeXFeedService: Sendable {
                 var request = URLRequest(url: url)
                 request.timeoutInterval = 15
                 request.cachePolicy = .reloadRevalidatingCacheData
-                request.setValue("BloxBreeze/1.3 (iOS; free native RSS reader)", forHTTPHeaderField: "User-Agent")
+                request.setValue("BloxBreeze/1.3.1 (iOS; free native RSS reader)", forHTTPHeaderField: "User-Agent")
 
                 let (data, response) = try await URLSession.shared.data(for: request)
                 guard let http = response as? HTTPURLResponse else { throw FeedError.invalidResponse }

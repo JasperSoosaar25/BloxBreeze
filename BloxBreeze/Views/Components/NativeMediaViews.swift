@@ -16,7 +16,10 @@ struct RemoteMediaImage: View {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
                                 .font(.caption.bold())
                                 .frame(width: 38, height: 38)
-                                .background(.ultraThinMaterial, in: Circle())
+                                .glassEffect(
+                                    .regular.tint(.black.opacity(0.14)).interactive(),
+                                    in: Circle()
+                                )
                                 .padding(10)
                         }
                 }
@@ -28,6 +31,7 @@ struct RemoteMediaImage: View {
         }
         .frame(maxWidth: .infinity)
         .clipShape(.rect(cornerRadius: 22))
+        .breezeGlass(cornerRadius: 22, tint: Color.breezeLavender.opacity(0.035))
     }
 
     private var image: some View {
@@ -48,7 +52,7 @@ struct RemoteMediaImage: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .background(Color(uiColor: .secondarySystemBackground))
+        .background(.clear)
         .contentShape(.rect)
     }
 }
@@ -83,15 +87,15 @@ struct InlineVideoView: View {
                         Rectangle().fill(.black.opacity(0.18))
 
                         VStack(spacing: 8) {
-                            Circle()
-                                .fill(.ultraThinMaterial)
+                            Image(systemName: "play.fill")
+                                .font(.title2.bold())
+                                .foregroundStyle(.white)
+                                .offset(x: 2)
                                 .frame(width: 64, height: 64)
-                                .overlay {
-                                    Image(systemName: "play.fill")
-                                        .font(.title2.bold())
-                                        .foregroundStyle(.white)
-                                        .offset(x: 2)
-                                }
+                                .glassEffect(
+                                    .regular.tint(.black.opacity(0.22)).interactive(),
+                                    in: Circle()
+                                )
                             Text("Play video")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.white)
@@ -137,10 +141,11 @@ struct FullScreenImageViewer: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Text("Drag after zooming to look around")
                 .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(Color.black.opacity(0.9))
+                .glassEffect(.regular.tint(.black.opacity(0.20)), in: Capsule())
+                .padding(.bottom, 6)
         }
         .task(id: item.id) { await loadImage() }
     }
@@ -161,7 +166,10 @@ struct FullScreenImageViewer: View {
                 Image(systemName: "xmark")
                     .font(.headline.bold())
                     .frame(width: 42, height: 42)
-                    .background(.white.opacity(0.14), in: Circle())
+                    .glassEffect(
+                        .regular.tint(.white.opacity(0.08)).interactive(),
+                        in: Circle()
+                    )
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close image")
@@ -169,7 +177,9 @@ struct FullScreenImageViewer: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
-        .background(Color.black.opacity(0.9))
+        .glassEffect(.regular.tint(.black.opacity(0.20)), in: .rect(cornerRadius: 24))
+        .padding(.horizontal, 10)
+        .padding(.top, 4)
     }
 
     @MainActor

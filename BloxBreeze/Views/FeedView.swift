@@ -162,22 +162,12 @@ private struct SourceFilterStrip: View {
                         .padding(.horizontal, 14)
                         .frame(minHeight: 46)
                         .contentShape(Capsule())
-                        .background {
-                            Capsule()
-                                .fill(
-                                    selected
-                                        ? source.tint.opacity(0.16)
-                                        : Color(uiColor: .secondarySystemBackground).opacity(0.88)
-                                )
-                        }
-                        .overlay {
-                            Capsule()
-                                .stroke(
-                                    selected ? source.tint.opacity(0.55) : Color(uiColor: .separator).opacity(0.35),
-                                    lineWidth: 1
-                                )
-                                .allowsHitTesting(false)
-                        }
+                        .glassEffect(
+                            .regular
+                                .tint(selected ? source.tint.opacity(0.18) : nil)
+                                .interactive(),
+                            in: Capsule()
+                        )
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(source.name)

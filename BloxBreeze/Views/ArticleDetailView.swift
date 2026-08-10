@@ -163,6 +163,11 @@ private struct VideoResolutionPanel: View {
                     } else {
                         Image(systemName: "arrow.clockwise.circle.fill")
                             .font(.system(size: 46))
+                            .frame(width: 62, height: 62)
+                            .glassEffect(
+                                .regular.tint(.black.opacity(0.18)).interactive(),
+                                in: Circle()
+                            )
                         Text(message ?? "Tap to load video")
                     }
                 }
@@ -174,6 +179,7 @@ private struct VideoResolutionPanel: View {
             .frame(maxWidth: .infinity)
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .clipShape(.rect(cornerRadius: 22))
+            .breezeGlass(cornerRadius: 22, tint: Color.breezeLavender.opacity(0.05))
         }
         .buttonStyle(.plain)
         .disabled(isLoading)

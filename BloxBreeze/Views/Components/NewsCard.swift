@@ -7,36 +7,41 @@ struct NewsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let imageURL = item.imageURL {
-                ZStack {
-                    AsyncImage(url: imageURL) { phase in
-                        switch phase {
-                        case let .success(image):
-                            image.resizable().scaledToFill()
-                        case .failure:
-                            imagePlaceholder
-                        default:
-                            ZStack {
+                GeometryReader { proxy in
+                    ZStack {
+                        AsyncImage(url: imageURL) { phase in
+                            switch phase {
+                            case let .success(image):
+                                image.resizable().scaledToFill()
+                            case .failure:
                                 imagePlaceholder
-                                ProgressView()
+                            default:
+                                ZStack {
+                                    imagePlaceholder
+                                    ProgressView()
+                                }
                             }
                         }
-                    }
+                        .frame(width: proxy.size.width, height: 156)
+                        .clipped()
 
-                    if looksLikeVideo {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .frame(width: 52, height: 52)
-                            .overlay {
-                                Image(systemName: "play.fill")
-                                    .font(.headline.bold())
-                                    .foregroundStyle(.white)
-                                    .offset(x: 1)
-                            }
+                        if looksLikeVideo {
+                            Image(systemName: "play.fill")
+                                .font(.headline.bold())
+                                .foregroundStyle(.white)
+                                .offset(x: 1)
+                                .frame(width: 52, height: 52)
+                                .glassEffect(
+                                    .regular.tint(.black.opacity(0.22)),
+                                    in: Circle()
+                                )
+                        }
                     }
+                    .frame(width: proxy.size.width, height: 156)
+                    .clipped()
                 }
                 .frame(height: 156)
                 .frame(maxWidth: .infinity)
-                .clipped()
             }
 
             VStack(alignment: .leading, spacing: 11) {
@@ -88,7 +93,6 @@ struct NewsCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(.rect)
-        .background(.clear)
         .clipShape(.rect(cornerRadius: 26))
         .breezeGlass(cornerRadius: 26, tint: item.source.tint.opacity(0.055))
         .accessibilityElement(children: .combine)
