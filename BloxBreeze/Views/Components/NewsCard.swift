@@ -9,13 +9,13 @@ struct NewsCard: View {
             if let imageURL = item.imageURL {
                 GeometryReader { proxy in
                     ZStack {
-                        AsyncImage(url: imageURL) { phase in
+                        HighQualityAsyncImage(url: imageURL) { phase in
                             switch phase {
                             case let .success(image):
-                                image.resizable().scaledToFill()
+                                NativeUIImageView(image: image, contentMode: .scaleAspectFill)
                             case .failure:
                                 imagePlaceholder
-                            default:
+                            case .empty:
                                 ZStack {
                                     imagePlaceholder
                                     ProgressView()

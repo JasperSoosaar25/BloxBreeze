@@ -17,7 +17,7 @@ struct XPostDetailService: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
         request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("BloxBreeze/1.4 (iOS; native media reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("BloxBreeze/1.5 (iOS; native media reader)", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse,
@@ -96,14 +96,7 @@ struct XPostDetailService: Sendable {
             let mp4Variants = variants.filter {
                 ($0["content_type"] as? String) == "video/mp4"
             }
-            let mobileVariants = mp4Variants.filter {
-                (($0["bitrate"] as? NSNumber)?.intValue ?? 0) <= 3_000_000
-            }
-            let mp4 = mobileVariants
-                .max {
-                    (($0["bitrate"] as? NSNumber)?.intValue ?? 0) <
-                        (($1["bitrate"] as? NSNumber)?.intValue ?? 0)
-                } ?? mp4Variants.min {
+            let mp4 = mp4Variants.max {
                     (($0["bitrate"] as? NSNumber)?.intValue ?? 0) <
                         (($1["bitrate"] as? NSNumber)?.intValue ?? 0)
                 }
@@ -123,7 +116,7 @@ struct XPostDetailService: Sendable {
         guard var components = URLComponents(string: value) else { return nil }
         var items = components.queryItems ?? []
         items.removeAll { $0.name == "name" }
-        items.append(URLQueryItem(name: "name", value: "large"))
+        items.append(URLQueryItem(name: "name", value: "orig"))
         components.queryItems = items
         return components.url
     }

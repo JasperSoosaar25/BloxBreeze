@@ -19,6 +19,7 @@ The three public X feeds arrive through free Nitter RSS mirrors. No X account, d
 - Clean native X post view populated by free RSS, with link-preview clutter removed
 - Self-reply and direct companion articles from RTC, Bloxy News, and 4Lulzy open in the native in-app reader
 - Full-screen pinch/double-tap image zoom and native AVKit video playback
+- Original-resolution DevForum and X images, animated GIF playback, retry fallbacks, and highest-bitrate available X video
 - Pull to refresh, source filters, search, read/unread state, and offline feed cache
 - Saved stories, gentle reading streak, light/dark mode, cozy color mode, Dynamic Type, and VoiceOver labels
 - Original non-brand app icon and a clear independent-app disclaimer
@@ -55,7 +56,7 @@ BloxBreeze itself has no subscription or paid service. Signing availability, dev
 
 ## Project notes
 
-- App version: 1.4.0
+- App version: 1.5.0 (build 7)
 - Deployment target: iOS 26.0
 - Device family: iPhone
 - Bundle identifier: `com.jasper.bloxbreeze` (safe to change in `project.yml`)

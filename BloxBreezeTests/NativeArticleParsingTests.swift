@@ -53,6 +53,56 @@ final class NativeArticleParsingTests: XCTestCase {
         XCTAssertFalse(normalized.contains(":star2:"))
     }
 
+    func testForumMediaUsesOriginalAssetAndDropsDiscourseMetadata() throws {
+        let forumHTML = #"""
+        <article>
+          <h1>Native creator update</h1>
+          <h2><img class="emoji" title=":hammer_and_wrench:" alt=":hammer_and_wrench:" src="/emoji.png"> Batching</h2>
+          <ol><li>Set the property.<br>
+            <div class="lightbox-wrapper"><a class="lightbox" href="//cdn.example.com/uploads/original/full.png">
+              <img src="//cdn.example.com/uploads/optimized/full_2_690x75.png" alt="image3">
+              <div class="meta"><span class="filename">image3</span><span class="informations">1204×132 12.3 KB</span></div>
+            </a></div>
+          </li></ol>
+        </article>
+        """#
+        let html = ArticleContentService.normalizeForumEmojiImages(forumHTML)
+        let item = NewsItem(
+            id: "forum:media",
+            source: .developerForum,
+            title: "Native creator update",
+            body: "Fallback",
+            category: "Announcements",
+            articleURL: URL(string: "https://devforum.roblox.com/t/native-update/123"),
+            imageURL: nil,
+            publishedAt: .now,
+            metrics: nil
+        )
+
+        let article = try ArticleContentService.parseGenericArticle(html, item: item)
+
+        XCTAssertTrue(article.blocks.contains { $0.kind == .heading && $0.text == "\u{1F6E0}\u{FE0F} Batching" })
+        XCTAssertTrue(article.blocks.contains { $0.kind == .bullet && $0.text == "Set the property." })
+        XCTAssertFalse(article.blocks.compactMap(\.text).contains { $0.contains("1204×132") || $0.contains("image3") })
+        let media = try XCTUnwrap(article.blocks.first { $0.kind == .image })
+        XCTAssertEqual(media.imageURL?.absoluteString, "https://cdn.example.com/uploads/original/full.png")
+        XCTAssertNil(media.caption)
+    }
+
+    func testHighQualityMediaCandidatesPreferOrigins() {
+        let nitter = URL(string: "https://nitter.net/pic/media%2Fcozy.jpg")!
+        XCTAssertEqual(
+            MediaImagePipeline.candidateURLs(for: nitter).first?.absoluteString,
+            "https://pbs.twimg.com/media/cozy.jpg?name=orig"
+        )
+
+        let optimized = URL(string: "https://cdn.example.com/uploads/optimized/5X/a/b/hash_2_690x75.png")!
+        XCTAssertEqual(
+            MediaImagePipeline.candidateURLs(for: optimized).first?.absoluteString,
+            "https://cdn.example.com/uploads/original/5X/a/b/hash.png"
+        )
+    }
+
     func testCompanionHTMLBecomesNativeArticle() throws {
         let html = #"""
         <html><head>

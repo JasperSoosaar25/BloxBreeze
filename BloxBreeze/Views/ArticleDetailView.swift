@@ -272,7 +272,7 @@ private struct NativePDFReader: View {
             var request = URLRequest(url: url)
             request.timeoutInterval = 45
             request.cachePolicy = .returnCacheDataElseLoad
-            request.setValue("BloxBreeze/1.4 (iOS; native document reader)", forHTTPHeaderField: "User-Agent")
+            request.setValue("BloxBreeze/1.5 (iOS; native document reader)", forHTTPHeaderField: "User-Agent")
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode),
@@ -321,9 +321,9 @@ private struct VideoResolutionPanel: View {
         Button(action: retry) {
             ZStack {
                 if let previewURL {
-                    AsyncImage(url: previewURL) { phase in
+                    HighQualityAsyncImage(url: previewURL) { phase in
                         if case let .success(image) = phase {
-                            image.resizable().scaledToFill()
+                            NativeUIImageView(image: image, contentMode: .scaleAspectFill)
                         } else {
                             Color(uiColor: .secondarySystemBackground)
                         }
@@ -424,7 +424,9 @@ private struct NativeArticleReader: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(verbatim: article.title)
-                        .font(.largeTitle.bold())
+                        .font(.title2.bold())
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
 
                     if let subtitle = article.subtitle {

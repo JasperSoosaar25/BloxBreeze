@@ -6,27 +6,28 @@ struct RemoteMediaImage: View {
     let url: URL
     var maxHeight: CGFloat = 340
     var onTap: (() -> Void)?
+    @State private var reloadID = 0
 
     var body: some View {
-        Group {
-            if let onTap {
-                Button(action: onTap) {
-                    image
-                        .overlay(alignment: .bottomTrailing) {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.caption.bold())
-                                .frame(width: 38, height: 38)
-                                .glassEffect(
-                                    .regular.tint(.black.opacity(0.14)).interactive(),
-                                    in: Circle()
-                                )
-                                .padding(10)
-                        }
+        HighQualityAsyncImage(url: url, reloadID: reloadID) { phase in
+            switch phase {
+            case let .success(image):
+                loadedImage(image)
+            case .failure:
+                VStack(spacing: 12) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.title2)
+                    Text("Image couldn't load")
+                        .font(.subheadline.weight(.semibold))
+                    Button("Try again") { reloadID += 1 }
+                        .buttonStyle(.glass)
                 }
-                .buttonStyle(.plain)
-                .accessibilityHint("Opens a centered full-screen image viewer")
-            } else {
-                image
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 170, maxHeight: maxHeight)
+            case .empty:
+                ProgressView()
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity, minHeight: 170, maxHeight: maxHeight)
             }
         }
         .frame(maxWidth: .infinity)
@@ -34,26 +35,38 @@ struct RemoteMediaImage: View {
         .breezeGlass(cornerRadius: 22, tint: Color.breezeLavender.opacity(0.035))
     }
 
-    private var image: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case let .success(image):
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: maxHeight)
-                    .padding(8)
-            case .failure:
-                ContentUnavailableView("Image unavailable", systemImage: "photo")
-                    .frame(maxWidth: .infinity, minHeight: 170, maxHeight: maxHeight)
-            default:
-                ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 170, maxHeight: maxHeight)
+    @ViewBuilder
+    private func loadedImage(_ image: UIImage) -> some View {
+        let rendered = NativeUIImageView(image: image, contentMode: .scaleAspectFit)
+            .aspectRatio(imageAspectRatio(image), contentMode: .fit)
+            .frame(maxWidth: .infinity, maxHeight: maxHeight)
+            .padding(8)
+            .contentShape(.rect)
+
+        if let onTap {
+            Button(action: onTap) {
+                rendered
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.caption.bold())
+                            .frame(width: 38, height: 38)
+                            .glassEffect(
+                                .regular.tint(.black.opacity(0.14)).interactive(),
+                                in: Circle()
+                            )
+                            .padding(10)
+                    }
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens a centered full-screen image viewer")
+        } else {
+            rendered
         }
-        .frame(maxWidth: .infinity)
-        .background(.clear)
-        .contentShape(.rect)
+    }
+
+    private func imageAspectRatio(_ image: UIImage) -> CGFloat {
+        guard image.size.height > 0 else { return 16.0 / 9.0 }
+        return image.size.width / image.size.height
     }
 }
 
@@ -73,9 +86,9 @@ struct InlineVideoView: View {
                 } label: {
                     ZStack {
                         if let previewURL = media.previewURL {
-                            AsyncImage(url: previewURL) { phase in
+                            HighQualityAsyncImage(url: previewURL) { phase in
                                 if case let .success(image) = phase {
-                                    image.resizable().scaledToFill()
+                                    NativeUIImageView(image: image, contentMode: .scaleAspectFill)
                                 } else {
                                     Color(uiColor: .secondarySystemBackground)
                                 }
@@ -119,6 +132,7 @@ struct FullScreenImageViewer: View {
     let item: ZoomableImageItem
     @State private var loadedImage: UIImage?
     @State private var loadFailed = false
+    @State private var reloadID = 0
 
     var body: some View {
         ZStack {
@@ -127,7 +141,14 @@ struct FullScreenImageViewer: View {
             if let loadedImage {
                 ZoomingImageScrollView(image: loadedImage)
             } else if loadFailed {
-                ContentUnavailableView("Image unavailable", systemImage: "photo")
+                VStack(spacing: 14) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.largeTitle)
+                    Text("Image couldn't load")
+                        .font(.headline)
+                    Button("Try again") { reloadID += 1 }
+                        .buttonStyle(.glass)
+                }
                     .foregroundStyle(.white)
             } else {
                 ProgressView()
@@ -147,7 +168,7 @@ struct FullScreenImageViewer: View {
                 .glassEffect(.regular.tint(.black.opacity(0.20)), in: Capsule())
                 .padding(.bottom, 6)
         }
-        .task(id: item.id) { await loadImage() }
+        .task(id: "\(item.id)#\(reloadID)") { await loadImage() }
     }
 
     private var viewerToolbar: some View {
@@ -187,20 +208,72 @@ struct FullScreenImageViewer: View {
         loadedImage = nil
         loadFailed = false
         do {
-            var request = URLRequest(url: item.url)
-            request.cachePolicy = .returnCacheDataElseLoad
-            request.timeoutInterval = 30
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode),
-                  let image = UIImage(data: data) else {
-                throw FeedError.invalidResponse
-            }
-            loadedImage = image
+            loadedImage = try await MediaImagePipeline.shared.image(for: item.url)
         } catch is CancellationError {
             return
         } catch {
             loadFailed = true
+        }
+    }
+}
+
+enum HighQualityImagePhase {
+    case empty
+    case success(UIImage)
+    case failure
+}
+
+struct HighQualityAsyncImage<Content: View>: View {
+    let url: URL
+    let reloadID: Int
+    let content: (HighQualityImagePhase) -> Content
+
+    @State private var phase = HighQualityImagePhase.empty
+
+    init(
+        url: URL,
+        reloadID: Int = 0,
+        @ViewBuilder content: @escaping (HighQualityImagePhase) -> Content
+    ) {
+        self.url = url
+        self.reloadID = reloadID
+        self.content = content
+    }
+
+    var body: some View {
+        content(phase)
+            .task(id: "\(url.absoluteString)#\(reloadID)") {
+                phase = .empty
+                do {
+                    phase = .success(try await MediaImagePipeline.shared.image(for: url))
+                } catch is CancellationError {
+                    return
+                } catch {
+                    phase = .failure
+                }
+            }
+    }
+}
+
+struct NativeUIImageView: UIViewRepresentable {
+    let image: UIImage
+    let contentMode: UIView.ContentMode
+
+    func makeUIView(context: Context) -> UIImageView {
+        let view = UIImageView()
+        view.clipsToBounds = true
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        return view
+    }
+
+    func updateUIView(_ view: UIImageView, context: Context) {
+        view.contentMode = contentMode
+        if view.image !== image {
+            view.image = image
+        }
+        if image.images != nil {
+            view.startAnimating()
         }
     }
 }
