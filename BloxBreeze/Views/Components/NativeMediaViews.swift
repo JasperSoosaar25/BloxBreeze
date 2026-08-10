@@ -76,27 +76,28 @@ struct InlineVideoView: View {
     @State private var isFullScreen = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        VStack(alignment: .trailing, spacing: 10) {
             playbackSurface
+                .aspectRatio(CGFloat(media.aspectRatio ?? (16.0 / 9.0)), contentMode: .fit)
+                .frame(maxWidth: .infinity, maxHeight: 430)
+                .background(.black)
+                .clipShape(.rect(cornerRadius: 22))
 
             Button(action: presentFullScreen) {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.white)
-                    .frame(width: 42, height: 42)
+                Label("Full screen", systemImage: "arrow.up.left.and.arrow.down.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 46)
                     .glassEffect(
-                        .regular.tint(.black.opacity(0.22)).interactive(),
-                        in: Circle()
+                        .regular.tint(Color.breezeLavender.opacity(0.10)).interactive(),
+                        in: Capsule()
                     )
             }
             .buttonStyle(.plain)
-            .padding(10)
+            .contentShape(Capsule())
             .accessibilityLabel("Play video full screen")
         }
-        .aspectRatio(CGFloat(media.aspectRatio ?? (16.0 / 9.0)), contentMode: .fit)
-        .frame(maxWidth: .infinity, maxHeight: 430)
-        .background(.black)
-        .clipShape(.rect(cornerRadius: 22))
         .fullScreenCover(isPresented: $isFullScreen) {
             if let player {
                 FullScreenVideoPlayer(player: player)
@@ -173,25 +174,39 @@ private struct FullScreenVideoPlayer: View {
             Color.black.ignoresSafeArea()
 
             VideoPlayer(player: player)
-                .ignoresSafeArea()
         }
-        .overlay(alignment: .topTrailing) {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.headline.bold())
+        .safeAreaInset(edge: .top, spacing: 0) {
+            HStack(spacing: 12) {
+                Label("Full-screen video", systemImage: "video.fill")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 46, height: 46)
-                    .glassEffect(
-                        .regular.tint(.black.opacity(0.24)).interactive(),
-                        in: Circle()
-                    )
+
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Label("Close", systemImage: "xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .glassEffect(
+                            .regular.tint(.black.opacity(0.24)).interactive(),
+                            in: Capsule()
+                        )
+                }
+                .buttonStyle(.plain)
+                .contentShape(Capsule())
+                .accessibilityLabel("Close full-screen video")
             }
-            .buttonStyle(.plain)
-            .padding(.top, 10)
-            .padding(.trailing, 14)
-            .accessibilityLabel("Close full-screen video")
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .glassEffect(
+                .regular.tint(.black.opacity(0.22)),
+                in: .rect(cornerRadius: 24)
+            )
+            .padding(.horizontal, 10)
         }
         .statusBarHidden(true)
         .onAppear { player.play() }
