@@ -43,7 +43,7 @@ struct FreeXFeedService: Sendable {
                 var request = URLRequest(url: url)
                 request.timeoutInterval = 15
                 request.cachePolicy = .reloadRevalidatingCacheData
-                request.setValue("BloxBreeze/1.3.1 (iOS; free native RSS reader)", forHTTPHeaderField: "User-Agent")
+                request.setValue("BloxBreeze/1.4 (iOS; free native RSS reader)", forHTTPHeaderField: "User-Agent")
 
                 let (data, response) = try await URLSession.shared.data(for: request)
                 guard let http = response as? HTTPURLResponse else { throw FeedError.invalidResponse }
@@ -96,6 +96,7 @@ private final class FreeXFeedDelegate: NSObject, XMLParserDelegate {
     private var buffer = ""
     private var current: [String: String] = [:]
     private var insideItem = false
+    private var threadParentIndex: Int?
     private(set) var items: [NewsItem] = []
 
     init(source: NewsSource) {
@@ -149,6 +150,19 @@ private final class FreeXFeedDelegate: NSObject, XMLParserDelegate {
         let displayText = body.isEmpty ? rawTitle : body
         guard !displayText.isEmpty else { return }
 
+        let isSelfReply = Self.isSelfReply(rawTitle, source: source)
+        let companionURL = Self.firstCompanionURL(in: rawDescription)
+
+        if isSelfReply,
+           let companionURL,
+           let threadParentIndex,
+           items.indices.contains(threadParentIndex) {
+            if items[threadParentIndex].articleURL == nil {
+                items[threadParentIndex] = items[threadParentIndex].withArticleURL(companionURL)
+            }
+            return
+        }
+
         let firstLine = displayText.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? displayText
         let title = firstLine.count > 100 ? String(firstLine.prefix(97)) + "…" : firstLine
         let identifier = current["guid"] ?? "\(source.id)-\(current["pubDate"] ?? title)"
@@ -161,12 +175,56 @@ private final class FreeXFeedDelegate: NSObject, XMLParserDelegate {
                 title: title,
                 body: displayText,
                 category: "@\(source.handle ?? source.name)",
-                articleURL: nil,
+                articleURL: companionURL,
                 imageURL: imageURL,
                 publishedAt: Self.date(from: current["pubDate"]) ?? .distantPast,
                 metrics: nil
             )
         )
+
+        if !isSelfReply {
+            threadParentIndex = items.indices.last
+        }
+    }
+
+    private static func isSelfReply(_ title: String, source: NewsSource) -> Bool {
+        guard let handle = source.handle else { return false }
+        return title.range(
+            of: "R to @\(handle):",
+            options: [.anchored, .caseInsensitive]
+        ) != nil
+    }
+
+    private static func firstCompanionURL(in html: String) -> URL? {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"href\s*=\s*[\"'](?<url>https?://[^\"']+)[\"']"#,
+            options: [.caseInsensitive]
+        ) else { return nil }
+
+        let range = NSRange(html.startIndex..<html.endIndex, in: html)
+        for match in regex.matches(in: html, range: range) {
+            guard let urlRange = Range(match.range(withName: "url"), in: html) else { continue }
+            let value = String(html[urlRange])
+                .replacingOccurrences(of: "&amp;", with: "&")
+            guard let url = URL(string: value), isReadableCompanionURL(url) else { continue }
+            return url
+        }
+        return nil
+    }
+
+    private static func isReadableCompanionURL(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        let path = url.path.lowercased()
+
+        if path.hasSuffix(".pdf") { return true }
+        if host == "devforum.roblox.com" { return true }
+        if host == "about.roblox.com" && path.contains("/newsroom/") { return true }
+        if host == "ir.roblox.com" && path.contains("/news/") { return true }
+        if host == "robloxrtc.com" || host == "www.robloxrtc.com" { return path.contains("/blog") }
+        if host == "bloxy.news" || host == "www.bloxy.news" { return path.contains("/post/") }
+        if host == "bloxynews.info" || host == "www.bloxynews.info" { return true }
+        if host == "medium.com" || host.hasSuffix(".medium.com") { return true }
+        return false
     }
 
     private static func firstImageURL(in html: String) -> URL? {

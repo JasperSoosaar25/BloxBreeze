@@ -52,6 +52,73 @@ final class FreeXFeedParsingTests: XCTestCase {
         XCTAssertFalse(items[0].body.contains("preview"))
     }
 
+    func testSelfReplyArticleIsMergedIntoOriginalPost() throws {
+        let xml = #"""
+        <?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0"><channel>
+          <item>
+            <title>Roblox is testing a cozy new creator feature.</title>
+            <description><![CDATA[
+              <p>Roblox is testing a cozy new creator feature.</p>
+              <img src="https://pbs.twimg.com/media/original.jpg" />
+            ]]></description>
+            <pubDate>Sat, 08 Aug 2026 02:00:04 GMT</pubDate>
+            <guid>2085908874994053302</guid>
+          </item>
+          <item>
+            <title>R to @Roblox_RTC: Applications and complete details are available here.</title>
+            <description><![CDATA[
+              <p>Applications and complete details are available here.<br><br>
+              <a href="https://devforum.roblox.com/t/cozy-creator-feature/4778993">devforum.roblox.com/t/cozy...</a></p>
+            ]]></description>
+            <pubDate>Sat, 08 Aug 2026 02:00:07 GMT</pubDate>
+            <guid>2085908887266578904</guid>
+          </item>
+        </channel></rss>
+        """#
+
+        let items = try FreeXFeedService.parse(Data(xml.utf8), source: .robloxRTC)
+
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items[0].id, "x:2085908874994053302")
+        XCTAssertEqual(
+            items[0].articleURL?.absoluteString,
+            "https://devforum.roblox.com/t/cozy-creator-feature/4778993"
+        )
+    }
+
+    func testDirectArticleLinkIsKeptButActionLinksAreIgnored() throws {
+        let xml = #"""
+        <?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0"><channel>
+          <item>
+            <title>A complete monthly recap.</title>
+            <description><![CDATA[
+              <p>A complete monthly recap.
+              <a href="https://bloxy.news/post/july26">Read it</a></p>
+            ]]></description>
+            <pubDate>Sat, 01 Aug 2026 15:00:01 GMT</pubDate>
+            <guid>2083568439503843798</guid>
+          </item>
+          <item>
+            <title>A catalog item is now available.</title>
+            <description><![CDATA[
+              <p>A catalog item is now available.
+              <a href="https://www.roblox.com/catalog/123/example">Get it</a></p>
+            ]]></description>
+            <pubDate>Fri, 31 Jul 2026 15:00:01 GMT</pubDate>
+            <guid>2083568439503843799</guid>
+          </item>
+        </channel></rss>
+        """#
+
+        let items = try FreeXFeedService.parse(Data(xml.utf8), source: .bloxyNews)
+
+        XCTAssertEqual(items.count, 2)
+        XCTAssertEqual(items[0].articleURL?.absoluteString, "https://bloxy.news/post/july26")
+        XCTAssertNil(items[1].articleURL)
+    }
+
     func testStatusIDAndSyndicatedTextCleanup() {
         XCTAssertEqual(
             XPostDetailService.statusID(in: "x:https://nitter.net/Bloxy_News/status/2086215099573010915#m"),

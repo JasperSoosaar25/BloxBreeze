@@ -65,13 +65,13 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("Version", value: "1.3.1")
+                    LabeledContent("Version", value: "1.4.0")
                     Label("Native Liquid Glass on iOS 26", systemImage: "circle.hexagongrid.fill")
                     Label("100% native article reader", systemImage: "text.document.fill")
                     Text("BloxBreeze is an independent reader. It is not endorsed by, affiliated with, or an official product of Roblox Corporation or X Corp.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("Roblox Newsroom and Developer Forum articles are converted into native text, Unicode emoji, and zoomable images. Public X posts use free RSS plus keyless public media details for native video playback. The app contains no web browser, paid API, account system, or token field.")
+                    Text("Roblox Newsroom, Developer Forum, and supported companion articles are converted into native text, Unicode emoji, zoomable images, or native documents. Public X posts use free RSS plus keyless public media details for native video playback. The app contains no web browser, paid API, account system, or token field.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

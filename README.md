@@ -1,6 +1,6 @@
 # BloxBreeze
 
-BloxBreeze is a zero-cost, native iPhone reader for Roblox news, built for iOS 26 with real SwiftUI Liquid Glass controls. Stories are converted into SwiftUI text, lists, quotes, and images; the app does not contain an embedded web browser and does not open story links.
+BloxBreeze is a zero-cost, native iPhone reader for Roblox news, built for iOS 26 with real SwiftUI Liquid Glass controls. Stories and supported source links are converted into SwiftUI text, lists, quotes, images, or native documents; the app does not contain an embedded web browser or send reading actions to Safari.
 
 Sources included:
 
@@ -17,6 +17,7 @@ The three public X feeds arrive through free Nitter RSS mirrors. No X account, d
 - Native SwiftUI navigation, tab bar, sheets, forms, search, and iOS 26 Liquid Glass
 - Native reader for Roblox Newsroom and Developer Forum text and images - no `WKWebView`
 - Clean native X post view populated by free RSS, with link-preview clutter removed
+- Self-reply and direct companion articles from RTC, Bloxy News, and 4Lulzy open in the native in-app reader
 - Full-screen pinch/double-tap image zoom and native AVKit video playback
 - Pull to refresh, source filters, search, read/unread state, and offline feed cache
 - Saved stories, gentle reading streak, light/dark mode, cozy color mode, Dynamic Type, and VoiceOver labels
@@ -49,17 +50,17 @@ BloxBreeze itself has no subscription or paid service. Signing availability, dev
 
 - Roblox Newsroom HTML is downloaded and reduced to article headings, paragraphs, lists, quotes, and images.
 - Developer Forum announcements use the forum's public JSON representation, then render the post as native SwiftUI blocks.
-- X source pages are read from public RSS mirrors and rendered as native post cards.
-- URLs contained in story text are non-interactive plain text. There is no browser component or external URL opener in the target.
+- X source pages are read from public RSS mirrors and rendered as native post cards. Supported article links in posts and self-replies are attached to their original card.
+- Supported HTML sources are reduced to native article blocks, while PDF sources use PDFKit. Other URLs remain non-interactive plain text. There is no browser component or external URL opener in the target.
 
 ## Project notes
 
-- App version: 1.3.1
+- App version: 1.4.0
 - Deployment target: iOS 26.0
 - Device family: iPhone
 - Bundle identifier: `com.jasper.bloxbreeze` (safe to change in `project.yml`)
 - Runtime dependency: SwiftSoup 2.13.5 (MIT-licensed Swift HTML parser)
-- Network hosts: Roblox Newsroom/media, `devforum.roblox.com`, and the configured Nitter RSS mirrors
+- Network hosts: Roblox Newsroom/media, `devforum.roblox.com`, configured Nitter RSS mirrors, and only the supported companion-article/document hosts supplied by those feeds
 
 Run the Windows-friendly static checks with:
 

@@ -1,3 +1,4 @@
+import PDFKit
 import SwiftUI
 
 struct ArticleDetailView: View {
@@ -69,6 +70,10 @@ private struct XPostReader: View {
                         )
                     }
 
+                    if item.articleURL != nil {
+                        CompanionArticleLink(item: item)
+                    }
+
                     if let metrics = item.metrics {
                         MetricsBar(metrics: metrics)
                     }
@@ -81,7 +86,11 @@ private struct XPostReader: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                    NativeReaderNotice(text: "Free RSS post - links are plain text and cannot open a browser.")
+                    NativeReaderNotice(
+                        text: item.articleURL == nil
+                            ? "Free RSS post - no webpage or browser is embedded."
+                            : "The source link opens only in BloxBreeze's native reader."
+                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(18)
@@ -128,6 +137,177 @@ private struct XPostReader: View {
             mediaError = "Video could not load. Tap to retry."
         }
         isResolvingMedia = false
+    }
+}
+
+private struct CompanionArticleLink: View {
+    let item: NewsItem
+
+    var body: some View {
+        NavigationLink {
+            CompanionContentView(item: item)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.title3.bold())
+                    .foregroundStyle(item.source.tint)
+                    .frame(width: 46, height: 46)
+                    .glassEffect(
+                        .regular.tint(item.source.tint.opacity(0.16)).interactive(),
+                        in: Circle()
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("More details")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(sourceLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .contentShape(.rect(cornerRadius: 22))
+            .breezeGlass(
+                cornerRadius: 22,
+                tint: item.source.tint.opacity(0.08),
+                interactive: true
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the linked source inside BloxBreeze")
+    }
+
+    private var sourceLabel: String {
+        guard let host = item.articleURL?.host else { return "Read inside BloxBreeze" }
+        return host.replacingOccurrences(of: "www.", with: "")
+    }
+}
+
+private struct CompanionContentView: View {
+    let item: NewsItem
+
+    var body: some View {
+        Group {
+            if let url = item.articleURL, ArticleContentService.isPDFURL(url) {
+                NativePDFReader(url: url)
+            } else {
+                NativeArticleReader(item: item)
+            }
+        }
+        .navigationTitle("More details")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct NativePDFReader: View {
+    let url: URL
+    @State private var document: PDFDocument?
+    @State private var errorMessage: String?
+    @State private var isLoading = true
+
+    var body: some View {
+        ZStack {
+            BreezeBackground()
+
+            if let document {
+                PDFDocumentView(document: document)
+                    .clipShape(.rect(cornerRadius: 22))
+                    .breezeGlass(cornerRadius: 22, tint: Color.breezeLavender.opacity(0.04))
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 82)
+            } else if isLoading {
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Preparing the source document...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(24)
+                .breezeGlass(cornerRadius: 24)
+            } else {
+                ContentUnavailableView {
+                    Label("Document unavailable", systemImage: "doc.text")
+                } description: {
+                    Text(errorMessage ?? "The source did not return a readable document.")
+                } actions: {
+                    Button("Try again") {
+                        Task { await load() }
+                    }
+                    .buttonStyle(.glassProminent)
+                }
+                .padding(24)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let document {
+                Label(
+                    "Native document - \(document.pageCount) pages",
+                    systemImage: "lock.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .breezeGlass(cornerRadius: 18)
+                .padding(.bottom, 6)
+            }
+        }
+        .task(id: url) { await load() }
+    }
+
+    @MainActor
+    private func load() async {
+        isLoading = true
+        errorMessage = nil
+        document = nil
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 45
+            request.cachePolicy = .returnCacheDataElseLoad
+            request.setValue("BloxBreeze/1.4 (iOS; native document reader)", forHTTPHeaderField: "User-Agent")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let loaded = PDFDocument(data: data) else {
+                throw FeedError.invalidResponse
+            }
+            document = loaded
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = "The source document could not be downloaded."
+        }
+        isLoading = false
+    }
+}
+
+private struct PDFDocumentView: UIViewRepresentable {
+    let document: PDFDocument
+
+    func makeUIView(context: Context) -> PDFView {
+        let view = PDFView()
+        view.backgroundColor = .clear
+        view.autoScales = true
+        view.displayMode = .singlePageContinuous
+        view.displayDirection = .vertical
+        view.displaysPageBreaks = true
+        view.document = document
+        return view
+    }
+
+    func updateUIView(_ view: PDFView, context: Context) {
+        if view.document !== document {
+            view.document = document
+            view.autoScales = true
+        }
     }
 }
 

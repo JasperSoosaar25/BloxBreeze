@@ -21,8 +21,8 @@ final class NewsStore: ObservableObject {
     private let freeXFeedService = FreeXFeedService()
 
     private enum Keys {
-        static let cache = "news-cache-v3"
-        static let lastUpdated = "last-updated-v3"
+        static let cache = "news-cache-v4"
+        static let lastUpdated = "last-updated-v4"
         static let selectedSources = "selected-sources-v1"
         static let savedIDs = "saved-ids-v1"
         static let readIDs = "read-ids-v1"

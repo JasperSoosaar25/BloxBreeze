@@ -12,18 +12,33 @@ struct ArticleContentService: Sendable {
             let html = try await fetchText(from: url)
             return try Self.parseNewsroom(html, item: item)
         case .developerForum:
-            let topicURL = Self.forumJSONURL(from: url)
-            let data = try await fetchData(from: topicURL)
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            let topic = try decoder.decode(ForumTopic.self, from: data)
-            guard let firstPost = topic.postStream.posts.first else {
-                throw FeedError.parsing("The official announcement did not contain a readable post.")
-            }
-            return try Self.parseForum(topic: topic, post: firstPost, item: item)
+            return try await fetchForum(item: item, url: url)
         case .x:
-            throw FeedError.parsing("X posts are already displayed natively.")
+            if Self.isForumURL(url) {
+                return try await fetchForum(item: item, url: url)
+            }
+            if Self.isNewsroomURL(url) {
+                let html = try await fetchText(from: url)
+                return try Self.parseNewsroom(html, item: item)
+            }
+            guard !Self.isPDFURL(url) else {
+                throw FeedError.parsing("This source is a document and uses the native document reader.")
+            }
+            let html = try await fetchText(from: url)
+            return try Self.parseGenericArticle(html, item: item)
         }
+    }
+
+    private func fetchForum(item: NewsItem, url: URL) async throws -> NativeArticle {
+        let topicURL = Self.forumJSONURL(from: url)
+        let data = try await fetchData(from: topicURL)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let topic = try decoder.decode(ForumTopic.self, from: data)
+        guard let firstPost = topic.postStream.posts.first else {
+            throw FeedError.parsing("The announcement did not contain a readable post.")
+        }
+        return try Self.parseForum(topic: topic, post: firstPost, item: item)
     }
 
     static func parseNewsroom(_ html: String, item: NewsItem) throws -> NativeArticle {
@@ -52,6 +67,83 @@ struct ArticleContentService: Sendable {
             byline: byline,
             publishedAt: item.publishedAt,
             heroImageURL: item.imageURL,
+            blocks: blocks
+        )
+    }
+
+    static func parseGenericArticle(_ html: String, item: NewsItem) throws -> NativeArticle {
+        let document = try SwiftSoup.parse(html, item.articleURL?.absoluteString ?? "")
+        let openGraphTitle = try document
+            .select("meta[property=og:title]")
+            .first()?
+            .attr("content")
+            .nonEmpty
+        let headingTitle = try document
+            .select("article h1, main h1, h1")
+            .first()?
+            .text()
+            .nonEmpty
+        let documentTitle = try document.title().nonEmpty
+        let title = openGraphTitle ?? headingTitle ?? documentTitle ?? item.title
+
+        let openGraphDescription = try document
+            .select("meta[property=og:description]")
+            .first()?
+            .attr("content")
+            .nonEmpty
+        let metaDescription = try document
+            .select("meta[name=description]")
+            .first()?
+            .attr("content")
+            .nonEmpty
+        let subtitle = openGraphDescription ?? metaDescription
+
+        let metaAuthor = try document
+            .select("meta[name=author]")
+            .first()?
+            .attr("content")
+            .nonEmpty
+        let visibleAuthor = try document
+            .select("[rel=author], [class*=author]")
+            .first()?
+            .text()
+            .nonEmpty
+        let author = metaAuthor ?? visibleAuthor
+
+        let articleRoot = try document.select("article").first()
+        let mainRoot = try document.select("main").first()
+        let roleRoot = try document.select("[role=main]").first()
+        let root = articleRoot ?? mainRoot ?? roleRoot ?? document.body()
+        guard let root else {
+            throw FeedError.parsing("The linked article did not contain readable content.")
+        }
+
+        let heroImageValue = try document
+            .select("meta[property=og:image]")
+            .first()?
+            .attr("content")
+            .nonEmpty
+        let heroImageURL = heroImageValue.flatMap {
+            URL(string: $0, relativeTo: item.articleURL)?.absoluteURL
+        }
+        var blocks = try parseBlocks(
+            in: root,
+            baseURL: item.articleURL,
+            excludingImage: heroImageURL
+        )
+        if blocks.first?.kind == .heading && blocks.first?.text == title {
+            blocks.removeFirst()
+        }
+        guard !blocks.isEmpty else {
+            throw FeedError.parsing("The linked article was found, but its native text was empty.")
+        }
+
+        return NativeArticle(
+            title: title,
+            subtitle: subtitle,
+            byline: author.map { $0.lowercased().hasPrefix("by ") ? $0 : "By \($0)" },
+            publishedAt: item.publishedAt,
+            heroImageURL: heroImageURL,
             blocks: blocks
         )
     }
@@ -155,7 +247,7 @@ struct ArticleContentService: Sendable {
                 try addNestedImages(element)
             case "img":
                 try addImage(element)
-            case "script", "style", "button", "nav", "footer":
+            case "script", "style", "button", "nav", "footer", "header", "aside", "form", "svg", "noscript":
                 return
             default:
                 for child in element.children().array() { try visit(child) }
@@ -176,7 +268,7 @@ struct ArticleContentService: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 30
         request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("BloxBreeze/1.3.1 (iOS; native article reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("BloxBreeze/1.4 (iOS; native article reader)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw FeedError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
@@ -192,6 +284,19 @@ struct ArticleContentService: Sendable {
         while components.path.hasSuffix("/") { components.path.removeLast() }
         if !components.path.hasSuffix(".json") { components.path += ".json" }
         return components.url ?? url
+    }
+
+    static func isPDFURL(_ url: URL) -> Bool {
+        url.path.lowercased().hasSuffix(".pdf")
+    }
+
+    private static func isForumURL(_ url: URL) -> Bool {
+        url.host?.caseInsensitiveCompare("devforum.roblox.com") == .orderedSame
+    }
+
+    private static func isNewsroomURL(_ url: URL) -> Bool {
+        url.host?.caseInsensitiveCompare("about.roblox.com") == .orderedSame &&
+            url.path.lowercased().contains("/newsroom/")
     }
 
     private static func isoDate(_ string: String?) -> Date? {

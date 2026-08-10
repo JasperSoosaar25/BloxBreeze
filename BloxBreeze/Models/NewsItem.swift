@@ -90,4 +90,19 @@ struct NewsItem: Identifiable, Codable, Hashable, Sendable {
             media: media
         )
     }
+
+    func withArticleURL(_ articleURL: URL) -> NewsItem {
+        NewsItem(
+            id: id,
+            source: source,
+            title: title,
+            body: body,
+            category: category,
+            articleURL: articleURL,
+            imageURL: imageURL,
+            publishedAt: publishedAt,
+            metrics: metrics,
+            media: media
+        )
+    }
 }

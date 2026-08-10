@@ -52,4 +52,42 @@ final class NativeArticleParsingTests: XCTestCase {
         XCTAssertTrue(normalized.contains("full-size-story.png"))
         XCTAssertFalse(normalized.contains(":star2:"))
     }
+
+    func testCompanionHTMLBecomesNativeArticle() throws {
+        let html = #"""
+        <html><head>
+          <meta property="og:title" content="A Deeper Roblox Story">
+          <meta property="og:description" content="The useful details behind the post.">
+          <meta name="author" content="RTC Research">
+          <meta property="og:image" content="/images/hero.png">
+        </head><body><article>
+          <h1>A Deeper Roblox Story</h1>
+          <p>The article is converted into native SwiftUI text.</p>
+          <h2>What it means</h2>
+          <ul><li>No webpage is displayed.</li></ul>
+          <img src="/images/detail.png" alt="Companion detail">
+        </article></body></html>
+        """#
+        let item = NewsItem(
+            id: "x:companion",
+            source: .robloxRTC,
+            title: "Fallback post title",
+            body: "Fallback post body",
+            category: "@Roblox_RTC",
+            articleURL: URL(string: "https://robloxrtc.com/blog/deeper-story"),
+            imageURL: nil,
+            publishedAt: Date(timeIntervalSince1970: 1_786_243_800),
+            metrics: nil
+        )
+
+        let article = try ArticleContentService.parseGenericArticle(html, item: item)
+
+        XCTAssertEqual(article.title, "A Deeper Roblox Story")
+        XCTAssertEqual(article.subtitle, "The useful details behind the post.")
+        XCTAssertEqual(article.byline, "By RTC Research")
+        XCTAssertEqual(article.heroImageURL?.absoluteString, "https://robloxrtc.com/images/hero.png")
+        XCTAssertFalse(article.blocks.contains { $0.kind == .heading && $0.text == article.title })
+        XCTAssertTrue(article.blocks.contains { $0.kind == .paragraph && $0.text?.contains("native SwiftUI") == true })
+        XCTAssertTrue(article.blocks.contains { $0.kind == .image && $0.imageURL?.absoluteString == "https://robloxrtc.com/images/detail.png" })
+    }
 }

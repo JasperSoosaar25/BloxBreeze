@@ -47,6 +47,11 @@ struct NewsCard: View {
             VStack(alignment: .leading, spacing: 11) {
                 HStack(spacing: 8) {
                     SourceBadge(source: item.source)
+                    if item.articleURL != nil {
+                        Label("Details", systemImage: "doc.text")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
                     if store.savedIDs.contains(item.id) {
                         Image(systemName: "heart.fill")

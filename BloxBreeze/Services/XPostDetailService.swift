@@ -17,7 +17,7 @@ struct XPostDetailService: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
         request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("BloxBreeze/1.3.1 (iOS; native media reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("BloxBreeze/1.4 (iOS; native media reader)", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse,
