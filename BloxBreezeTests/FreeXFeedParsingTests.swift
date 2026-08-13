@@ -174,4 +174,48 @@ final class FreeXFeedParsingTests: XCTestCase {
         XCTAssertEqual(detail.media[0].url.absoluteString, "https://video.twimg.com/original.mp4")
         XCTAssertEqual(detail.media[0].aspectRatio, 9.0 / 16.0)
     }
+
+    func testQuotedPostVideoBecomesPlayableMedia() throws {
+        let json = #"""
+        {
+          "text": "we got Roblox x Fortnite collab before GTA 6",
+          "quoted_tweet": {
+            "id_str": "2087162231230443856",
+            "text": "The deer has found itself in an unfamiliar forest.",
+            "mediaDetails": [{
+              "type": "video",
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2087161937461395456/img/preview.jpg",
+              "original_info": { "height": 2160, "width": 3840 },
+              "video_info": {
+                "aspect_ratio": [16, 9],
+                "variants": [
+                  { "content_type": "application/x-mpegURL", "url": "https://video.twimg.com/quoted.m3u8" },
+                  { "bitrate": 832000, "content_type": "video/mp4", "url": "https://video.twimg.com/quoted-360p.mp4" },
+                  { "bitrate": 2176000, "content_type": "video/mp4", "url": "https://video.twimg.com/quoted-720p.mp4" }
+                ]
+              }
+            }]
+          }
+        }
+        """#
+        let item = NewsItem(
+            id: "x:2087230615624269875",
+            source: .bloxyNews,
+            title: "Roblox x Fortnite",
+            body: "Fallback body",
+            category: "@Bloxy_News",
+            articleURL: nil,
+            imageURL: nil,
+            publishedAt: .now,
+            metrics: nil
+        )
+
+        let detail = try XPostDetailService.parse(Data(json.utf8), fallbackItem: item)
+
+        XCTAssertEqual(detail.media.count, 1)
+        XCTAssertEqual(detail.media[0].kind, .video)
+        XCTAssertEqual(detail.media[0].url.absoluteString, "https://video.twimg.com/quoted-720p.mp4")
+        XCTAssertEqual(detail.media[0].previewURL?.absoluteString, "https://pbs.twimg.com/amplify_video_thumb/2087161937461395456/img/preview.jpg?name=orig")
+        XCTAssertEqual(detail.media[0].aspectRatio, 16.0 / 9.0)
+    }
 }

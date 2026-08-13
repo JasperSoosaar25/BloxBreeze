@@ -33,14 +33,27 @@ struct XPostDetailService: Sendable {
               let payloadText = payload["text"] as? String else {
             throw FeedError.parsing("The public media response did not contain a readable post.")
         }
-        let mediaItems = payload["mediaDetails"] as? [[String: Any]] ?? []
-        let media = mediaItems.compactMap(Self.makeMedia)
+        let media = Self.mediaItems(in: payload)
+            .compactMap(Self.makeMedia)
+            .reduce(into: [XPostMedia]()) { result, item in
+                guard !result.contains(where: { $0.id == item.id }) else { return }
+                result.append(item)
+            }
         let cleanText = Self.cleanPostText(payloadText)
 
         return XPostDetail(
             text: cleanText.isEmpty ? item.body : cleanText,
             media: media
         )
+    }
+
+    private static func mediaItems(in payload: [String: Any]) -> [[String: Any]] {
+        var items = payload["mediaDetails"] as? [[String: Any]] ?? []
+        for key in ["quoted_tweet", "retweeted_tweet", "retweeted_status"] {
+            guard let nested = payload[key] as? [String: Any] else { continue }
+            items.append(contentsOf: mediaItems(in: nested))
+        }
+        return items
     }
 
     static func statusID(in value: String) -> String? {

@@ -60,6 +60,12 @@ if ($mediaViews -notmatch 'FullScreenVideoPlayer' -or
     throw 'The native video player must retain its full-screen presentation.'
 }
 
+$xDetailService = Get-Content -Raw -LiteralPath (Join-Path $root 'BloxBreeze/Services/XPostDetailService.swift')
+if ($xDetailService -notmatch 'quoted_tweet' -or
+    $xDetailService -notmatch 'mediaItems\(in: nested\)') {
+    throw 'Quoted X post media must remain available to the native player.'
+}
+
 $paidXFlow = $swift | Select-String -Pattern 'XAPIService|SecureTokenStore|api\.x\.com|developer\.x\.com'
 if ($paidXFlow) {
     throw 'A paid/token-based X API flow was found; X sources must remain free and keyless.'
