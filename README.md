@@ -58,7 +58,7 @@ BloxBreeze itself has no subscription or paid service. Signing availability, dev
 
 ## Project notes
 
-- App version: 1.6.2 (build 10)
+- App version: 1.6.3 (build 11)
 - Deployment target: iOS 26.0
 - Device family: iPhone
 - Bundle identifier: `com.jasper.bloxbreeze` (safe to change in `project.yml`)

@@ -48,7 +48,10 @@ final class FreeXFeedParsingTests: XCTestCase {
 
         let items = try FreeXFeedService.parse(Data(xml.utf8), source: .robloxRTC)
 
-        XCTAssertEqual(items[0].body, "Applications remain open until August 13th.")
+        XCTAssertEqual(
+            items[0].body,
+            "Applications remain open until August 13th.\n\nhttps://devforum.roblox.com/t/example/123"
+        )
         XCTAssertFalse(items[0].body.contains("preview"))
     }
 
@@ -84,6 +87,64 @@ final class FreeXFeedParsingTests: XCTestCase {
         XCTAssertEqual(
             items[0].articleURL?.absoluteString,
             "https://devforum.roblox.com/t/cozy-creator-feature/4778993"
+        )
+        XCTAssertEqual(items[0].orderedThreadReplies.count, 1)
+        XCTAssertEqual(
+            items[0].orderedThreadReplies[0].text,
+            "Applications and complete details are available here.\n\nhttps://devforum.roblox.com/t/cozy-creator-feature/4778993"
+        )
+    }
+
+    func testSelfReplyThreadIsGroupedOldestFirstWithFullMentionsAndSourceLink() throws {
+        let xml = #"""
+        <?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0"><channel>
+          <item>
+            <title>R to @Roblox_RTC: Source: @politico https://www.politico.com/live-updates/full-story</title>
+            <description><![CDATA[
+              <p>Source: <a href="https://nitter.net/politico">@politico</a><br>
+              <a href="https://www.politico.com/live-updates/full-story">politico.com/live-updates/…</a></p>
+              <hr/><b>Link</b><p>A preview must never replace the source post.</p>
+            ]]></description>
+            <pubDate>Thu, 13 Aug 2026 20:16:43 GMT</pubDate>
+            <guid>2087996795700035830</guid>
+          </item>
+          <item>
+            <title>R to @Roblox_RTC: Senators @HawleyMO and @DickDurbin have launched a bipartisan probe.</title>
+            <description><![CDATA[
+              <p>Senators <a href="https://nitter.net/HawleyMO">@HawleyMO</a> and <a href="https://nitter.net/DickDurbin">@DickDurbin</a> have launched a bipartisan probe.<br><br>
+              Lawmakers requested complete documentation.<br><br>
+              Josh Hawley and Dick Durbin asked Roblox to respond no later than August 31st, 2026.</p>
+            ]]></description>
+            <pubDate>Thu, 13 Aug 2026 20:16:41 GMT</pubDate>
+            <guid>2087996783943385432</guid>
+          </item>
+          <item>
+            <title>The U.S. Senate is launching an investigation into Roblox.</title>
+            <description><![CDATA[
+              <p>The U.S. Senate is launching an investigation into Roblox.</p>
+              <img src="https://nitter.net/pic/media%2Fexample.jpg" />
+            ]]></description>
+            <pubDate>Thu, 13 Aug 2026 20:16:38 GMT</pubDate>
+            <guid>2087996771557634408</guid>
+          </item>
+        </channel></rss>
+        """#
+
+        let items = try FreeXFeedService.parse(Data(xml.utf8), source: .robloxRTC)
+
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items[0].id, "x:2087996771557634408")
+        XCTAssertEqual(items[0].orderedThreadReplies.map(\.id), [
+            "x:2087996783943385432",
+            "x:2087996795700035830"
+        ])
+        XCTAssertTrue(items[0].orderedThreadReplies[0].text.contains("@HawleyMO"))
+        XCTAssertTrue(items[0].orderedThreadReplies[0].text.contains("@DickDurbin"))
+        XCTAssertTrue(items[0].orderedThreadReplies[0].text.hasSuffix("August 31st, 2026."))
+        XCTAssertEqual(
+            items[0].orderedThreadReplies[1].text,
+            "Source: @politico\n\nhttps://www.politico.com/live-updates/full-story"
         )
     }
 
@@ -131,6 +192,43 @@ final class FreeXFeedParsingTests: XCTestCase {
         XCTAssertEqual(
             XPostDetailService.cleanPostText("A tidy post https://t.co/example"),
             "A tidy post"
+        )
+        XCTAssertEqual(
+            XPostDetailService.cleanPostText("Source: @politico\nhttps://www.politico.com/full-story"),
+            "Source: @politico\nhttps://www.politico.com/full-story"
+        )
+    }
+
+    func testSyndicatedExternalURLIsExpandedAndKept() throws {
+        let json = #"""
+        {
+          "text": "Source: @politico\nhttps://t.co/JOSLU4gQF9",
+          "entities": {
+            "urls": [{
+              "url": "https://t.co/JOSLU4gQF9",
+              "expanded_url": "https://www.politico.com/live-updates/full-story",
+              "display_url": "politico.com/live-updates/…"
+            }]
+          }
+        }
+        """#
+        let item = NewsItem(
+            id: "x:2087996795700035830",
+            source: .robloxRTC,
+            title: "Source",
+            body: "Fallback body",
+            category: "@Roblox_RTC",
+            articleURL: nil,
+            imageURL: nil,
+            publishedAt: .now,
+            metrics: nil
+        )
+
+        let detail = try XPostDetailService.parse(Data(json.utf8), fallbackItem: item)
+
+        XCTAssertEqual(
+            detail.text,
+            "Source: @politico\nhttps://www.politico.com/live-updates/full-story"
         )
     }
 

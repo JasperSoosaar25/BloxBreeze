@@ -5,6 +5,13 @@ struct XPostDetail: Hashable, Sendable {
     let media: [XPostMedia]
 }
 
+struct XThreadReply: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let text: String
+    let publishedAt: Date
+    let articleURL: URL?
+}
+
 struct XPostMedia: Identifiable, Codable, Hashable, Sendable {
     enum Kind: String, Codable, Hashable, Sendable {
         case image

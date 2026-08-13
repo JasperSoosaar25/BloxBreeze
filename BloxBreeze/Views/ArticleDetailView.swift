@@ -44,11 +44,7 @@ private struct XPostReader: View {
                 VStack(alignment: .leading, spacing: 20) {
                     SourceBadge(source: item.source)
 
-                    Text(verbatim: detail?.text ?? item.body)
-                        .font(.body)
-                        .lineSpacing(6)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
+                    SocialPostText(text: primaryText)
 
                     ForEach(displayMedia) { media in
                         switch media.kind {
@@ -70,6 +66,13 @@ private struct XPostReader: View {
                         )
                     }
 
+                    if !item.orderedThreadReplies.isEmpty {
+                        XThreadRepliesView(
+                            replies: item.orderedThreadReplies,
+                            source: item.source
+                        )
+                    }
+
                     if item.articleURL != nil {
                         CompanionArticleLink(item: item)
                     }
@@ -88,7 +91,7 @@ private struct XPostReader: View {
 
                     NativeReaderNotice(
                         text: item.articleURL == nil
-                            ? "Free RSS post - no webpage or browser is embedded."
+                            ? "Free native thread. Highlighted mentions and source addresses do not open a browser."
                             : "The source link opens only in BloxBreeze's native reader."
                     )
                 }
@@ -103,6 +106,11 @@ private struct XPostReader: View {
         .fullScreenCover(item: $selectedImage) { image in
             FullScreenImageViewer(item: image)
         }
+    }
+
+    private var primaryText: String {
+        guard let resolvedText = detail?.text, !resolvedText.isEmpty else { return item.body }
+        return resolvedText.count >= item.body.count ? resolvedText : item.body
     }
 
     private var displayMedia: [XPostMedia] {
@@ -137,6 +145,83 @@ private struct XPostReader: View {
             mediaError = "Video could not load. Tap to retry."
         }
         isResolvingMedia = false
+    }
+}
+
+private struct XThreadRepliesView: View {
+    let replies: [XThreadReply]
+    let source: NewsSource
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Thread - \(replies.count + 1) posts", systemImage: "text.bubble.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(source.tint)
+
+            ForEach(replies.indices, id: \.self) { index in
+                let reply = replies[index]
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.turn.down.right")
+                            .foregroundStyle(source.tint)
+                        Text("Reply \(index + 1) of \(replies.count)")
+                            .fontWeight(.semibold)
+                        Spacer(minLength: 8)
+                        Text(reply.publishedAt.formatted(date: .omitted, time: .shortened))
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.caption)
+
+                    SocialPostText(text: reply.text)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .breezeGlass(cornerRadius: 22, tint: source.tint.opacity(0.065))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SocialPostText: View {
+    let text: String
+
+    var body: some View {
+        styledText
+            .font(.body)
+            .lineSpacing(6)
+            .fixedSize(horizontal: false, vertical: true)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var styledText: Text {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"(?<![A-Za-z0-9_])@[A-Za-z0-9_]{1,30}|(?<![A-Za-z0-9_])#[A-Za-z0-9_]+|https?://[^\s]+"#
+        ) else { return Text(verbatim: text) }
+
+        let matches = regex.matches(
+            in: text,
+            range: NSRange(text.startIndex..<text.endIndex, in: text)
+        )
+        var output = Text("")
+        var cursor = text.startIndex
+
+        for match in matches {
+            guard let range = Range(match.range, in: text) else { continue }
+            if cursor < range.lowerBound {
+                output = output + Text(verbatim: String(text[cursor..<range.lowerBound]))
+            }
+            output = output + Text(verbatim: String(text[range]))
+                .foregroundColor(.blue)
+                .fontWeight(.semibold)
+            cursor = range.upperBound
+        }
+
+        if cursor < text.endIndex {
+            output = output + Text(verbatim: String(text[cursor...]))
+        }
+        return output
     }
 }
 

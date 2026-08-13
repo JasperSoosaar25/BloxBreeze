@@ -52,6 +52,12 @@ struct NewsCard: View {
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
+                    if !item.orderedThreadReplies.isEmpty {
+                        Label("\(item.orderedThreadReplies.count + 1)", systemImage: "text.bubble")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("\(item.orderedThreadReplies.count + 1) posts in this thread")
+                    }
                     Spacer()
                     if store.savedIDs.contains(item.id) {
                         Image(systemName: "heart.fill")

@@ -39,7 +39,7 @@ struct XPostDetailService: Sendable {
                 guard !result.contains(where: { $0.id == item.id }) else { return }
                 result.append(item)
             }
-        let cleanText = Self.cleanPostText(payloadText)
+        let cleanText = Self.expandedPostText(payloadText, payload: payload)
 
         return XPostDetail(
             text: cleanText.isEmpty ? item.body : cleanText,
@@ -74,13 +74,35 @@ struct XPostDetailService: Sendable {
 
     static func cleanPostText(_ value: String) -> String {
         value
-            .replacingOccurrences(of: #"\s*https?://\S+"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"\[?\s*Source:\s*\]?"#, with: "", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"\s*https?://t\.co/\S+"#, with: "", options: [.regularExpression, .caseInsensitive])
             .replacingOccurrences(of: #"(?:Learn more|Watch on YouTube):\s*$"#, with: "", options: [.regularExpression, .caseInsensitive])
             .replacingOccurrences(of: "[ \\t]+", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\n[ \\t]+", with: "\n", options: .regularExpression)
             .replacingOccurrences(of: "\\n{3,}", with: "\n\n", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func expandedPostText(_ value: String, payload: [String: Any]) -> String {
+        guard let entities = payload["entities"] as? [String: Any] else {
+            return cleanPostText(value)
+        }
+
+        var result = value
+        let media = entities["media"] as? [[String: Any]] ?? []
+        for entity in media {
+            guard let shortURL = entity["url"] as? String else { continue }
+            result = result.replacingOccurrences(of: shortURL, with: "")
+        }
+
+        let urls = entities["urls"] as? [[String: Any]] ?? []
+        for entity in urls {
+            guard let shortURL = entity["url"] as? String,
+                  let expandedURL = entity["expanded_url"] as? String,
+                  !expandedURL.isEmpty else { continue }
+            result = result.replacingOccurrences(of: shortURL, with: expandedURL)
+        }
+
+        return cleanPostText(result)
     }
 
     private static func makeMedia(_ item: [String: Any]) -> XPostMedia? {

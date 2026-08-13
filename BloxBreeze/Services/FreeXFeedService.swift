@@ -92,11 +92,21 @@ struct FreeXFeedService: Sendable {
 }
 
 private final class FreeXFeedDelegate: NSObject, XMLParserDelegate {
+    private struct ParsedEntry {
+        let position: Int
+        let identifier: String
+        let rawTitle: String
+        let displayText: String
+        let companionURL: URL?
+        let imageURL: URL?
+        let publishedAt: Date
+    }
+
     private let source: NewsSource
     private var buffer = ""
     private var current: [String: String] = [:]
     private var insideItem = false
-    private var threadParentIndex: Int?
+    private var entries: [ParsedEntry] = []
     private(set) var items: [NewsItem] = []
 
     init(source: NewsSource) {
@@ -135,7 +145,7 @@ private final class FreeXFeedDelegate: NSObject, XMLParserDelegate {
     ) {
         guard insideItem else { return }
         if elementName == "item" {
-            makeItem()
+            makeEntry()
             insideItem = false
         } else if ["title", "description", "pubDate", "guid", "link", "dc:creator", "creator"].contains(elementName) {
             current[elementName] = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -143,48 +153,91 @@ private final class FreeXFeedDelegate: NSObject, XMLParserDelegate {
         buffer = ""
     }
 
-    private func makeItem() {
+    func parserDidEndDocument(_ parser: XMLParser) {
+        buildItems()
+    }
+
+    private func makeEntry() {
         let rawDescription = current["description"] ?? ""
         let body = rawDescription.nativePostText
         let rawTitle = current["title"]?.nativePlainText ?? body
         let displayText = body.isEmpty ? rawTitle : body
         guard !displayText.isEmpty else { return }
 
-        let isSelfReply = Self.isSelfReply(rawTitle, source: source)
         let companionURL = Self.firstCompanionURL(in: rawDescription)
 
-        if isSelfReply,
-           let companionURL,
-           let threadParentIndex,
-           items.indices.contains(threadParentIndex) {
-            if items[threadParentIndex].articleURL == nil {
-                items[threadParentIndex] = items[threadParentIndex].withArticleURL(companionURL)
-            }
-            return
-        }
-
-        let firstLine = displayText.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? displayText
-        let title = firstLine.count > 100 ? String(firstLine.prefix(97)) + "…" : firstLine
-        let identifier = current["guid"] ?? "\(source.id)-\(current["pubDate"] ?? title)"
+        let identifier = current["guid"] ?? "\(source.id)-\(current["pubDate"] ?? displayText)"
         let imageURL = Self.firstImageURL(in: rawDescription)
 
-        items.append(
-            NewsItem(
-                id: "x:\(identifier)",
-                source: source,
-                title: title,
-                body: displayText,
-                category: "@\(source.handle ?? source.name)",
-                articleURL: companionURL,
+        entries.append(
+            ParsedEntry(
+                position: entries.count,
+                identifier: identifier,
+                rawTitle: rawTitle,
+                displayText: displayText,
+                companionURL: companionURL,
                 imageURL: imageURL,
-                publishedAt: Self.date(from: current["pubDate"]) ?? .distantPast,
-                metrics: nil
+                publishedAt: Self.date(from: current["pubDate"]) ?? .distantPast
             )
         )
+    }
 
-        if !isSelfReply {
-            threadParentIndex = items.indices.last
+    private func buildItems() {
+        var grouped: [(position: Int, item: NewsItem)] = []
+        var threadParentIndex: Int?
+        let chronologicalEntries = entries.sorted {
+            if $0.publishedAt == $1.publishedAt { return $0.position < $1.position }
+            return $0.publishedAt < $1.publishedAt
         }
+
+        for entry in chronologicalEntries {
+            let isSelfReply = Self.isSelfReply(entry.rawTitle, source: source)
+            if isSelfReply,
+               let threadParentIndex,
+               grouped.indices.contains(threadParentIndex) {
+                let reply = XThreadReply(
+                    id: "x:\(entry.identifier)",
+                    text: entry.displayText,
+                    publishedAt: entry.publishedAt,
+                    articleURL: entry.companionURL
+                )
+                var parent = grouped[threadParentIndex].item.withThreadReply(reply)
+                if parent.articleURL == nil, let companionURL = entry.companionURL {
+                    parent = parent.withArticleURL(companionURL)
+                }
+                grouped[threadParentIndex].item = parent
+                continue
+            }
+
+            grouped.append((entry.position, makeNewsItem(from: entry)))
+            threadParentIndex = isSelfReply ? nil : grouped.indices.last
+        }
+
+        items = grouped
+            .sorted { $0.position < $1.position }
+            .map { $0.item }
+    }
+
+    private func makeNewsItem(from entry: ParsedEntry) -> NewsItem {
+        let firstLine = entry.displayText
+            .split(separator: "\n", maxSplits: 1)
+            .first
+            .map(String.init) ?? entry.displayText
+        let cleanTitle = firstLine
+            .replacingOccurrences(of: #"\s+https?://\S+"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return NewsItem(
+            id: "x:\(entry.identifier)",
+            source: source,
+            title: cleanTitle.isEmpty ? firstLine : cleanTitle,
+            body: entry.displayText,
+            category: "@\(source.handle ?? source.name)",
+            articleURL: entry.companionURL,
+            imageURL: entry.imageURL,
+            publishedAt: entry.publishedAt,
+            metrics: nil
+        )
     }
 
     private static func isSelfReply(_ title: String, source: NewsSource) -> Bool {
@@ -271,7 +324,7 @@ private extension String {
 
         var withoutLinkCards = primaryHTML
         if let anchorRegex = try? NSRegularExpression(
-            pattern: #"<a\b[^>]*>(?<label>.*?)</a>"#,
+            pattern: #"<a\b(?=[^>]*\bhref\s*=\s*[\"'](?<url>[^\"']+)[\"'])[^>]*>(?<label>.*?)</a>"#,
             options: [.caseInsensitive, .dotMatchesLineSeparators]
         ) {
             let matches = anchorRegex.matches(
@@ -280,16 +333,24 @@ private extension String {
             )
             for match in matches.reversed() {
                 guard let wholeRange = Range(match.range, in: withoutLinkCards),
-                      let labelRange = Range(match.range(withName: "label"), in: withoutLinkCards) else { continue }
+                      let labelRange = Range(match.range(withName: "label"), in: withoutLinkCards),
+                      let urlRange = Range(match.range(withName: "url"), in: withoutLinkCards) else { continue }
                 let label = String(withoutLinkCards[labelRange]).nativePlainText
-                let replacement = (label.hasPrefix("@") || label.hasPrefix("#")) ? label : ""
+                let href = String(withoutLinkCards[urlRange])
+                    .replacingOccurrences(of: "&amp;", with: "&")
+                let replacement: String
+                if label.hasPrefix("@") || label.hasPrefix("#") {
+                    replacement = label
+                } else if href.lowercased().hasPrefix("http://") || href.lowercased().hasPrefix("https://") {
+                    replacement = href
+                } else {
+                    replacement = label
+                }
                 withoutLinkCards.replaceSubrange(wholeRange, with: replacement)
             }
         }
 
         return withoutLinkCards.nativePlainText
-            .replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"\[?\s*Source:\s*\]?"#, with: "", options: [.regularExpression, .caseInsensitive])
             .split(separator: "\n", omittingEmptySubsequences: false)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && $0.caseInsensitiveCompare("Video") != .orderedSame && $0.caseInsensitiveCompare("Link") != .orderedSame }

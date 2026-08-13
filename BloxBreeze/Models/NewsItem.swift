@@ -18,6 +18,7 @@ struct NewsItem: Identifiable, Codable, Hashable, Sendable {
     let publishedAt: Date
     let metrics: Metrics?
     let media: [XPostMedia]?
+    let threadReplies: [XThreadReply]?
 
     init(
         id: String,
@@ -29,7 +30,8 @@ struct NewsItem: Identifiable, Codable, Hashable, Sendable {
         imageURL: URL?,
         publishedAt: Date,
         metrics: Metrics?,
-        media: [XPostMedia]? = nil
+        media: [XPostMedia]? = nil,
+        threadReplies: [XThreadReply]? = nil
     ) {
         self.id = id
         self.source = source
@@ -41,11 +43,17 @@ struct NewsItem: Identifiable, Codable, Hashable, Sendable {
         self.publishedAt = publishedAt
         self.metrics = metrics
         self.media = media
+        self.threadReplies = threadReplies
+    }
+
+    private var searchableParts: [String] {
+        [title, body, category, source.name, source.handle]
+            .compactMap { $0 }
+            + orderedThreadReplies.map(\.text)
     }
 
     var searchableText: String {
-        [title, body, category, source.name, source.handle]
-            .compactMap { $0 }
+        searchableParts
             .joined(separator: " ")
     }
 
@@ -58,7 +66,18 @@ struct NewsItem: Identifiable, Codable, Hashable, Sendable {
     }
 
     var readingTime: Int {
-        max(1, Int(ceil(Double(max(body.split(separator: " ").count, 120)) / 220.0)))
+        let words = ([body] + orderedThreadReplies.map(\.text))
+            .joined(separator: " ")
+            .split(separator: " ")
+            .count
+        return max(1, Int(ceil(Double(max(words, 120)) / 220.0)))
+    }
+
+    var orderedThreadReplies: [XThreadReply] {
+        (threadReplies ?? []).sorted {
+            if $0.publishedAt == $1.publishedAt { return $0.id < $1.id }
+            return $0.publishedAt < $1.publishedAt
+        }
     }
 
     func withPublishedAt(_ date: Date) -> NewsItem {
@@ -72,7 +91,8 @@ struct NewsItem: Identifiable, Codable, Hashable, Sendable {
             imageURL: imageURL,
             publishedAt: date,
             metrics: metrics,
-            media: media
+            media: media,
+            threadReplies: threadReplies
         )
     }
 
@@ -87,7 +107,8 @@ struct NewsItem: Identifiable, Codable, Hashable, Sendable {
             imageURL: imageURL,
             publishedAt: publishedAt,
             metrics: metrics,
-            media: media
+            media: media,
+            threadReplies: threadReplies
         )
     }
 
@@ -102,7 +123,28 @@ struct NewsItem: Identifiable, Codable, Hashable, Sendable {
             imageURL: imageURL,
             publishedAt: publishedAt,
             metrics: metrics,
-            media: media
+            media: media,
+            threadReplies: threadReplies
+        )
+    }
+
+    func withThreadReply(_ reply: XThreadReply) -> NewsItem {
+        var replies = threadReplies ?? []
+        if !replies.contains(where: { $0.id == reply.id }) {
+            replies.append(reply)
+        }
+        return NewsItem(
+            id: id,
+            source: source,
+            title: title,
+            body: body,
+            category: category,
+            articleURL: articleURL,
+            imageURL: imageURL,
+            publishedAt: publishedAt,
+            metrics: metrics,
+            media: media,
+            threadReplies: replies
         )
     }
 }
