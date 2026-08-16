@@ -17,6 +17,9 @@ The three public X feeds arrive through free Nitter RSS mirrors. No X account, d
 - Native SwiftUI navigation, tab bar, sheets, forms, search, and iOS 26 Liquid Glass
 - Native reader for Roblox Newsroom and Developer Forum text and images - no `WKWebView`
 - Clean native X post view populated by free RSS, with link-preview clutter removed
+- Tappable @mentions with native public profiles, verification, stats, local appearances, and recent posts
+- On-device Hashtag Garden with post/story/source counts and matching-story navigation
+- Tappable addresses with native article, PDF, and Roblox catalog destinations—never Safari or a web view
 - Self-reply and direct companion articles from RTC, Bloxy News, and 4Lulzy open in the native in-app reader
 - Full-screen pinch/double-tap image zoom and native AVKit video playback
 - One-tap full-screen video playback that preserves the current position when returning inline
@@ -53,17 +56,17 @@ BloxBreeze itself has no subscription or paid service. Signing availability, dev
 
 - Roblox Newsroom HTML is downloaded and reduced to article headings, paragraphs, lists, quotes, and images.
 - Developer Forum announcements use the forum's public JSON representation, then render the post as native SwiftUI blocks.
-- X source pages are read from public RSS mirrors and rendered as native post cards. Supported article links in posts and self-replies are attached to their original card.
-- Supported HTML sources are reduced to native article blocks, while PDF sources use PDFKit. Other URLs remain non-interactive plain text. There is no browser component or external URL opener in the target.
+- X source pages are read from public RSS mirrors and rendered as native post cards. Mentions, hashtags, and addresses become internal BloxBreeze destinations.
+- Supported HTML sources are reduced to native article blocks, PDF sources use PDFKit, and Roblox catalog addresses use public item metadata. Profiles are requested on demand from FxEmbed's free keyless public API. There is no browser component or external URL opener in the target.
 
 ## Project notes
 
-- App version: 1.6.3 (build 11)
+- App version: 1.7.0 (build 12)
 - Deployment target: iOS 26.0
 - Device family: iPhone
 - Bundle identifier: `com.jasper.bloxbreeze` (safe to change in `project.yml`)
 - Runtime dependency: SwiftSoup 2.13.5 (MIT-licensed Swift HTML parser)
-- Network hosts: Roblox Newsroom/media, `devforum.roblox.com`, configured Nitter RSS mirrors, and only the supported companion-article/document hosts supplied by those feeds
+- Network hosts: Roblox Newsroom/media/catalog APIs, `devforum.roblox.com`, configured Nitter RSS mirrors, `api.fxtwitter.com` for profiles requested by the user, and source article/document hosts selected inside the app
 
 Run the Windows-friendly static checks with:
 

@@ -80,6 +80,10 @@ struct NewsItem: Identifiable, Codable, Hashable, Sendable {
         }
     }
 
+    var allPostTexts: [String] {
+        [body] + orderedThreadReplies.map(\.text)
+    }
+
     func withPublishedAt(_ date: Date) -> NewsItem {
         NewsItem(
             id: id,

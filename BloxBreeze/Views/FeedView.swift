@@ -50,6 +50,15 @@ struct FeedView: View {
             .searchable(text: $store.searchText, prompt: "Search your news")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        HashtagGardenView()
+                    } label: {
+                        Image(systemName: "number")
+                    }
+                    .accessibilityLabel("Open Hashtag Garden")
+                    .accessibilityValue("\(store.hashtagStats.count) tracked hashtags")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { await store.refresh() }
                     } label: {
@@ -123,8 +132,13 @@ private struct CozyDigestCard: View {
                     .foregroundStyle(Color.breezePeach, Color.breezeLavender)
             }
 
-            HStack(spacing: 18) {
-                Label("\(store.readingStreak) day streak", systemImage: "flame.fill")
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 18) {
+                    Label("\(store.readingStreak) day streak", systemImage: "flame.fill")
+                    if !store.hashtagStats.isEmpty {
+                        Label("\(store.hashtagStats.count) tags", systemImage: "number")
+                    }
+                }
                 if let updated = store.lastUpdated {
                     Label(updated.formatted(.relative(presentation: .named)), systemImage: "clock")
                 } else {

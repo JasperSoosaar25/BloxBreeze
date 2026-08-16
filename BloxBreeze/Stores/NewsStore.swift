@@ -75,6 +75,82 @@ final class NewsStore: ObservableObject {
         return streak
     }
 
+    var hashtagStats: [HashtagStat] {
+        struct Accumulator {
+            var displayTag: String
+            var postCount = 0
+            var storyIDs: Set<String> = []
+            var sourceIDs: Set<String> = []
+        }
+
+        var values: [String: Accumulator] = [:]
+        for item in items {
+            for text in item.allPostTexts {
+                let uniqueTags = Dictionary(
+                    grouping: PostEntityExtractor.hashtags(in: text),
+                    by: { $0.lowercased() }
+                )
+                for (normalized, spellings) in uniqueTags {
+                    guard let displayTag = spellings.first else { continue }
+                    var value = values[normalized] ?? Accumulator(displayTag: displayTag)
+                    value.postCount += 1
+                    value.storyIDs.insert(item.id)
+                    value.sourceIDs.insert(item.source.id)
+                    values[normalized] = value
+                }
+            }
+        }
+
+        return values.values
+            .map {
+                HashtagStat(
+                    tag: $0.displayTag,
+                    postCount: $0.postCount,
+                    storyCount: $0.storyIDs.count,
+                    sourceCount: $0.sourceIDs.count
+                )
+            }
+            .sorted {
+                if $0.postCount == $1.postCount {
+                    return $0.tag.localizedCaseInsensitiveCompare($1.tag) == .orderedAscending
+                }
+                return $0.postCount > $1.postCount
+            }
+    }
+
+    func items(matchingHashtag tag: String) -> [NewsItem] {
+        let normalized = tag.trimmingCharacters(in: CharacterSet(charactersIn: "#")).lowercased()
+        return items.filter { item in
+            item.allPostTexts.contains { text in
+                PostEntityExtractor.hashtags(in: text).contains {
+                    $0.lowercased() == normalized
+                }
+            }
+        }
+    }
+
+    func items(mentioning handle: String) -> [NewsItem] {
+        let normalized = handle.trimmingCharacters(in: CharacterSet(charactersIn: "@")).lowercased()
+        return items.filter { item in
+            item.allPostTexts.contains { text in
+                PostEntityExtractor.mentions(in: text).contains {
+                    $0.lowercased() == normalized
+                }
+            }
+        }
+    }
+
+    func mentionPostCount(handle: String) -> Int {
+        let normalized = handle.trimmingCharacters(in: CharacterSet(charactersIn: "@")).lowercased()
+        return items.reduce(into: 0) { total, item in
+            total += item.allPostTexts.filter { text in
+                PostEntityExtractor.mentions(in: text).contains {
+                    $0.lowercased() == normalized
+                }
+            }.count
+        }
+    }
+
     func refresh() async {
         guard !isLoading else { return }
         isLoading = true

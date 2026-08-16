@@ -11,6 +11,11 @@ $requiredFiles = @(
     'BloxBreeze/Services/ArticleContentService.swift',
     'BloxBreeze/Services/MediaImagePipeline.swift',
     'BloxBreeze/Services/XPostDetailService.swift',
+    'BloxBreeze/Services/XProfileService.swift',
+    'BloxBreeze/Services/RobloxCatalogService.swift',
+    'BloxBreeze/Models/ContentInsights.swift',
+    'BloxBreeze/Views/CommunityViews.swift',
+    'BloxBreeze/Views/Components/InteractivePostText.swift',
     'BloxBreeze/Views/Components/NativeMediaViews.swift',
     '.github/workflows/build-unsigned-ipa.yml'
 )

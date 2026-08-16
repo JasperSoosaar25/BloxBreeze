@@ -44,6 +44,40 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        HashtagGardenView()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading) {
+                                Text("Hashtag Garden")
+                                Text("\(store.hashtagStats.count) community topics tracked on this iPhone")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "number.circle.fill")
+                                .foregroundStyle(Color.breezeLavender)
+                        }
+                    }
+
+                    Label {
+                        VStack(alignment: .leading) {
+                            Text("Tap mentions for profiles")
+                            Text("Real public profile details and recent posts, opened natively")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .foregroundStyle(Color.breezeMint)
+                    }
+                } header: {
+                    Text("Community tools")
+                } footer: {
+                    Text("Hashtag counts are calculated locally from downloaded stories. Profiles are requested only when you tap a highlighted @mention.")
+                }
+
+                Section {
                     Label("Active — no API key", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                     LabeledContent("Cost", value: "Free")
@@ -51,7 +85,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Free X delivery")
                 } footer: {
-                    Text("Public posts arrive through free, privacy-friendly Nitter RSS mirrors. No X login, developer account, API token, or subscription is needed. If one mirror is unavailable, BloxBreeze automatically tries another.")
+                    Text("Public posts arrive through free, privacy-friendly Nitter RSS mirrors. Tapped profiles use FxEmbed's free keyless public profile reader. No X login, developer account, API token, or subscription is needed.")
                 }
 
                 Section("Offline & privacy") {
@@ -65,13 +99,13 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("Version", value: "1.6.3")
+                    LabeledContent("Version", value: "1.7.0")
                     Label("Native Liquid Glass on iOS 26", systemImage: "circle.hexagongrid.fill")
-                    Label("100% native article reader", systemImage: "text.document.fill")
+                    Label("Native articles, profiles & links", systemImage: "text.document.fill")
                     Text("BloxBreeze is an independent reader. It is not endorsed by, affiliated with, or an official product of Roblox Corporation or X Corp.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("Roblox Newsroom, Developer Forum, and supported companion articles are converted into native text, Unicode emoji, zoomable images, or native documents. Public X posts use free RSS plus keyless public media details for native video playback. The app contains no web browser, paid API, account system, or token field.")
+                    Text("Roblox Newsroom, Developer Forum, profiles, Roblox catalog addresses, and supported articles are converted into native SwiftUI views. Public X posts use free RSS plus keyless public media and profile details. The app contains no web browser, paid API, account system, or token field.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

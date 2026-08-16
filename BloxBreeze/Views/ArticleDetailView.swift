@@ -1,5 +1,6 @@
 import PDFKit
 import SwiftUI
+import UIKit
 
 struct ArticleDetailView: View {
     @EnvironmentObject private var store: NewsStore
@@ -35,6 +36,7 @@ private struct XPostReader: View {
     @State private var selectedImage: ZoomableImageItem?
     @State private var isResolvingMedia = false
     @State private var mediaError: String?
+    @State private var entityRoute: ContentEntityRoute?
 
     var body: some View {
         ZStack {
@@ -44,7 +46,9 @@ private struct XPostReader: View {
                 VStack(alignment: .leading, spacing: 20) {
                     SourceBadge(source: item.source)
 
-                    SocialPostText(text: primaryText)
+                    InteractivePostText(text: primaryText) { route in
+                        entityRoute = route
+                    }
 
                     ForEach(displayMedia) { media in
                         switch media.kind {
@@ -69,7 +73,8 @@ private struct XPostReader: View {
                     if !item.orderedThreadReplies.isEmpty {
                         XThreadRepliesView(
                             replies: item.orderedThreadReplies,
-                            source: item.source
+                            source: item.source,
+                            onOpen: { route in entityRoute = route }
                         )
                     }
 
@@ -105,6 +110,9 @@ private struct XPostReader: View {
         }
         .fullScreenCover(item: $selectedImage) { image in
             FullScreenImageViewer(item: image)
+        }
+        .sheet(item: $entityRoute) { route in
+            ContentEntitySheet(route: route, contextItem: item)
         }
     }
 
@@ -151,6 +159,7 @@ private struct XPostReader: View {
 private struct XThreadRepliesView: View {
     let replies: [XThreadReply]
     let source: NewsSource
+    let onOpen: (ContentEntityRoute) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -172,7 +181,7 @@ private struct XThreadRepliesView: View {
                     }
                     .font(.caption)
 
-                    SocialPostText(text: reply.text)
+                    InteractivePostText(text: reply.text, onOpen: onOpen)
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -180,48 +189,6 @@ private struct XThreadRepliesView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct SocialPostText: View {
-    let text: String
-
-    var body: some View {
-        styledText
-            .font(.body)
-            .lineSpacing(6)
-            .fixedSize(horizontal: false, vertical: true)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var styledText: Text {
-        guard let regex = try? NSRegularExpression(
-            pattern: #"(?<![A-Za-z0-9_])@[A-Za-z0-9_]{1,30}|(?<![A-Za-z0-9_])#[A-Za-z0-9_]+|https?://[^\s]+"#
-        ) else { return Text(verbatim: text) }
-
-        let matches = regex.matches(
-            in: text,
-            range: NSRange(text.startIndex..<text.endIndex, in: text)
-        )
-        var output = Text("")
-        var cursor = text.startIndex
-
-        for match in matches {
-            guard let range = Range(match.range, in: text) else { continue }
-            if cursor < range.lowerBound {
-                output = output + Text(verbatim: String(text[cursor..<range.lowerBound]))
-            }
-            output = output + Text(verbatim: String(text[range]))
-                .foregroundColor(.blue)
-                .fontWeight(.semibold)
-            cursor = range.upperBound
-        }
-
-        if cursor < text.endIndex {
-            output = output + Text(verbatim: String(text[cursor...]))
-        }
-        return output
     }
 }
 
@@ -275,7 +242,7 @@ private struct CompanionArticleLink: View {
     }
 }
 
-private struct CompanionContentView: View {
+struct CompanionContentView: View {
     let item: NewsItem
 
     var body: some View {
@@ -480,12 +447,26 @@ private struct NativeArticleReader: View {
                 ContentUnavailableView {
                     Label("Story could not be prepared", systemImage: "newspaper")
                 } description: {
-                    Text(errorMessage ?? "The source did not return readable story text.")
+                    VStack(spacing: 8) {
+                        Text(errorMessage ?? "The source did not return readable story text.")
+                        if let url = item.articleURL {
+                            Text(verbatim: url.absoluteString)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.blue)
+                                .textSelection(.enabled)
+                        }
+                    }
                 } actions: {
                     Button("Try again") {
                         Task { await load() }
                     }
                     .buttonStyle(.glassProminent)
+                    if let url = item.articleURL {
+                        Button("Copy address", systemImage: "doc.on.doc") {
+                            UIPasteboard.general.url = url
+                        }
+                        .buttonStyle(.glass)
+                    }
                 }
                 .padding(24)
             }
