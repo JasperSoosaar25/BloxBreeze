@@ -58,7 +58,7 @@ enum ContentEntityRoute: Identifiable, Hashable, Sendable {
             self = .hashtag(tag)
         case "link":
             guard let value = values["url"], let url = URL(string: value) else { return nil }
-            self = .link(url)
+            self = .link(NativeLinkResolver.secure(url))
         default:
             return nil
         }
@@ -107,7 +107,7 @@ enum PostEntityExtractor {
                 guard let url = URL(string: token) else { return nil }
                 return PostEntityMatch(
                     range: NSRange(stringRange, in: text),
-                    entity: .link(url)
+                    entity: .link(NativeLinkResolver.secure(url))
                 )
             }
             if token.hasPrefix("@") {
@@ -135,5 +135,17 @@ enum PostEntityExtractor {
             guard case let .mention(handle) = $0.entity else { return nil }
             return handle
         }
+    }
+}
+
+enum NativeLinkResolver {
+    static func secure(_ url: URL) -> URL {
+        guard url.scheme?.caseInsensitiveCompare("http") == .orderedSame,
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        components.scheme = "https"
+        if components.port == 80 { components.port = nil }
+        return components.url ?? url
     }
 }

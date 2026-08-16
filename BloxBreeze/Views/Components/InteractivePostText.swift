@@ -3,12 +3,14 @@ import UIKit
 
 struct InteractivePostText: View {
     let text: String
+    var font: Font = .body
+    var lineSpacing: CGFloat = 6
     let onOpen: (ContentEntityRoute) -> Void
 
     var body: some View {
         Text(styledText)
-            .font(.body)
-            .lineSpacing(6)
+            .font(font)
+            .lineSpacing(lineSpacing)
             .fixedSize(horizontal: false, vertical: true)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)

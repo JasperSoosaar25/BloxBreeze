@@ -99,7 +99,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("Version", value: "1.7.0")
+                    LabeledContent("Version", value: "1.7.1")
                     Label("Native Liquid Glass on iOS 26", systemImage: "circle.hexagongrid.fill")
                     Label("Native articles, profiles & links", systemImage: "text.document.fill")
                     Text("BloxBreeze is an independent reader. It is not endorsed by, affiliated with, or an official product of Roblox Corporation or X Corp.")

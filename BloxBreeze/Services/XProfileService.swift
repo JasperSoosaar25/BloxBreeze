@@ -28,7 +28,9 @@ struct XProfileService: Sendable {
             name: user.name,
             biography: user.description,
             location: user.location?.nonEmpty,
-            websiteURL: user.website?.url.flatMap(URL.init(string:)),
+            websiteURL: user.website?.url
+                .flatMap(URL.init(string:))
+                .map(NativeLinkResolver.secure),
             websiteLabel: user.website?.displayUrl,
             avatarURL: highQualityAvatar(user.avatarUrl),
             bannerURL: user.bannerUrl.flatMap(URL.init(string:)),
@@ -55,7 +57,7 @@ struct XProfileService: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
         request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("BloxBreeze/1.7 (iOS; keyless native profile reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("BloxBreeze/1.7.1 (iOS; keyless native profile reader)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode) else {

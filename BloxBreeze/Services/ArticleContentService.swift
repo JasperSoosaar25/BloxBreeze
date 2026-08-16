@@ -3,9 +3,11 @@ import SwiftSoup
 
 struct ArticleContentService: Sendable {
     func fetch(item: NewsItem) async throws -> NativeArticle {
-        guard let url = item.articleURL else {
+        guard let sourceURL = item.articleURL else {
             throw FeedError.parsing("This story has no article address.")
         }
+        let url = NativeLinkResolver.secure(sourceURL)
+        let item = item.withArticleURL(url)
 
         switch item.source.kind {
         case .newsroom:
@@ -388,7 +390,7 @@ struct ArticleContentService: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 30
         request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("BloxBreeze/1.6 (iOS; native article reader)", forHTTPHeaderField: "User-Agent")
+        request.setValue("BloxBreeze/1.7.1 (iOS; native article reader)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw FeedError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
